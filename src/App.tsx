@@ -1,0 +1,31 @@
+import { useState } from "react";
+import Sidebar from "./components/Sidebar";
+import ChatView from "./components/ChatView";
+import MemoryPanel from "./components/MemoryPanel";
+import SkillBrowser from "./components/SkillBrowser";
+import OnboardingWizard from "./components/OnboardingWizard";
+import { useAppStore } from "./stores/appStore";
+
+type RightPanel = "none" | "memory" | "skills";
+
+function App() {
+  const { isOnboarded } = useAppStore();
+  const [rightPanel, setRightPanel] = useState<RightPanel>("none");
+
+  if (!isOnboarded) {
+    return <OnboardingWizard />;
+  }
+
+  return (
+    <div className="flex h-screen overflow-hidden">
+      <Sidebar onTogglePanel={setRightPanel} activePanel={rightPanel} />
+      <main className="flex-1 flex">
+        <ChatView />
+        {rightPanel === "memory" && <MemoryPanel />}
+        {rightPanel === "skills" && <SkillBrowser />}
+      </main>
+    </div>
+  );
+}
+
+export default App;
