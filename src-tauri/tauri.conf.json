@@ -38,17 +38,7 @@
   },
   "plugins": {
     "shell": {
-      "open": true,
-      "scope": [
-        {
-          "name": "bun-agent",
-          "cmd": "bun",
-          "args": true
-        }
-      ]
-    },
-    "fs": {
-      "scope": ["$APPDATA/**", "$HOME/.lume/**"]
+      "open": true
     }
   }
 }
