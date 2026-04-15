@@ -338,7 +338,7 @@ export default function Settings({ onClose }: SettingsProps) {
                     { p: "openai", m: "gpt-5.4", label: "GPT-5.4" },
                     { p: "google", m: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro" },
                     { p: "deepseek", m: "deepseek-chat", label: "DeepSeek V3" },
-                    { p: "openai", m: "codex", label: "Codex" },
+                    { p: "openai", m: "gpt-5.4-mini", label: "GPT-5.4 Mini" },
                     { p: "groq", m: "llama-3.3-70b-versatile", label: "Llama 3.3 70B" },
                   ].map((item) => {
                     const prov = getProviderById(item.p);

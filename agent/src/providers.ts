@@ -46,12 +46,12 @@ export const PROVIDERS: ProviderConfig[] = [
     models: [
       { id: "gpt-5.4", name: "GPT-5.4", contextWindow: 200000 },
       { id: "gpt-5.4-mini", name: "GPT-5.4 Mini", contextWindow: 200000 },
-      { id: "gpt-5", name: "GPT-5", contextWindow: 200000 },
-      { id: "gpt-4o", name: "GPT-4o", contextWindow: 128000 },
-      { id: "gpt-4o-mini", name: "GPT-4o Mini", contextWindow: 128000 },
+      { id: "gpt-5.4-nano", name: "GPT-5.4 Nano", contextWindow: 200000 },
+      { id: "gpt-5.4-pro", name: "GPT-5.4 Pro", contextWindow: 200000 },
+      { id: "gpt-5-mini", name: "GPT-5 Mini", contextWindow: 200000 },
+      { id: "gpt-5-nano", name: "GPT-5 Nano", contextWindow: 200000 },
       { id: "o4-mini", name: "o4-mini", contextWindow: 200000 },
-      { id: "o3", name: "o3", contextWindow: 200000 },
-      { id: "o3-mini", name: "o3-mini", contextWindow: 200000 },
+      { id: "gpt-4o", name: "GPT-4o", contextWindow: 128000 },
     ],
   },
   {

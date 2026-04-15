@@ -46,13 +46,16 @@ export const PROVIDERS: ProviderInfo[] = [
     apiKeyPlaceholder: "sk-proj-...",
     signupUrl: "https://platform.openai.com",
     models: [
+      // Frontier (from developers.openai.com 2026-04)
       { id: "gpt-5.4", name: "GPT-5.4" },
       { id: "gpt-5.4-mini", name: "GPT-5.4 Mini" },
-      { id: "gpt-5.2", name: "GPT-5.2" },
-      { id: "codex", name: "Codex" },
+      { id: "gpt-5.4-nano", name: "GPT-5.4 Nano" },
+      { id: "gpt-5.4-pro", name: "GPT-5.4 Pro" },
+      // Previous gen
+      { id: "gpt-5-mini", name: "GPT-5 Mini" },
+      { id: "gpt-5-nano", name: "GPT-5 Nano" },
+      // Reasoning
       { id: "o4-mini", name: "o4-mini" },
-      { id: "o3", name: "o3" },
-      { id: "o3-mini", name: "o3-mini" },
       { id: "gpt-4o", name: "GPT-4o" },
     ],
   },
