@@ -1,37 +1,38 @@
 /**
- * AgentRouter: Multi-model routing with Claude as the primary model.
+ * AgentRouter: Universal multi-model routing.
  *
- * Builds the system prompt with:
- * - Memory Layer 1 (USER.md) + Layer 2 (ENV.md) as system context
- * - L0 skill summaries (names + descriptions only)
- * - Action preview instructions (always show plan before executing)
+ * Supports 20+ providers via two API formats:
+ * - Anthropic format (Anthropic Claude)
+ * - OpenAI-compatible format (everyone else)
+ *
+ * Builds the system prompt with memory layers + skill summaries.
  */
 
 import Anthropic from "@anthropic-ai/sdk";
+import { PROVIDERS, getProvider, type ProviderConfig } from "./providers";
 
 interface ChatRequest {
   sessionId: string;
   messages: Array<{ role: string; content: string }>;
   systemContext: string;
   skillsSummary: string[];
+  provider?: string;
+  model?: string;
+  apiKey?: string;
+  baseUrl?: string;
 }
 
 interface ChatResponse {
   content: string;
   tokenUsage: { input: number; output: number };
+  model: string;
+  provider: string;
   toolCalls?: Array<{ name: string; input: Record<string, unknown> }>;
   skillUpdate?: { name: string; action: "created" | "updated" };
 }
 
 export class AgentRouter {
-  private client: Anthropic | null = null;
-
-  private getClient(): Anthropic {
-    if (!this.client) {
-      this.client = new Anthropic();
-    }
-    return this.client;
-  }
+  private anthropicClients = new Map<string, Anthropic>();
 
   async chat(req: ChatRequest): Promise<ChatResponse> {
     const systemPrompt = this.buildSystemPrompt(
@@ -39,42 +40,170 @@ export class AgentRouter {
       req.skillsSummary
     );
 
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const providerId = req.provider || process.env.LUME_PROVIDER || "anthropic";
+    const provider = getProvider(providerId);
+    if (!provider) {
+      return this.errorResponse(providerId, `Unknown provider: ${providerId}`);
+    }
+
+    const modelId =
+      req.model ||
+      process.env.LUME_MODEL ||
+      provider.models[0]?.id ||
+      "claude-sonnet-4-20250514";
+
+    const apiKey =
+      req.apiKey ||
+      process.env[provider.apiKeyEnv] ||
+      process.env.LUME_API_KEY ||
+      "";
+
     if (!apiKey) {
       return {
-        content:
-          "No API key configured. Please set up your AI model in Settings, or use the built-in relay.",
+        content: `No API key for ${provider.name}. Set it in Settings or as environment variable ${provider.apiKeyEnv}.`,
         tokenUsage: { input: 0, output: 0 },
+        model: modelId,
+        provider: providerId,
       };
     }
+
+    const baseUrl = req.baseUrl || process.env.LUME_BASE_URL || provider.baseUrl;
 
     try {
-      const client = this.getClient();
-      const response = await client.messages.create({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 4096,
-        system: systemPrompt,
-        messages: req.messages.map((m) => ({
-          role: m.role as "user" | "assistant",
-          content: m.content,
-        })),
-      });
-
-      const textBlock = response.content.find((b) => b.type === "text");
-      return {
-        content: textBlock?.text ?? "",
-        tokenUsage: {
-          input: response.usage.input_tokens,
-          output: response.usage.output_tokens,
-        },
-      };
+      if (provider.format === "anthropic") {
+        return await this.callAnthropic(
+          apiKey,
+          baseUrl,
+          modelId,
+          providerId,
+          systemPrompt,
+          req.messages
+        );
+      } else {
+        return await this.callOpenAICompatible(
+          apiKey,
+          baseUrl,
+          modelId,
+          providerId,
+          systemPrompt,
+          req.messages
+        );
+      }
     } catch (err) {
-      return {
-        content: `LLM error: ${err instanceof Error ? err.message : String(err)}`,
-        tokenUsage: { input: 0, output: 0 },
-      };
+      return this.errorResponse(
+        providerId,
+        err instanceof Error ? err.message : String(err),
+        modelId
+      );
     }
   }
+
+  // ─────────── Anthropic Native ───────────
+
+  private async callAnthropic(
+    apiKey: string,
+    baseUrl: string,
+    model: string,
+    provider: string,
+    systemPrompt: string,
+    messages: Array<{ role: string; content: string }>
+  ): Promise<ChatResponse> {
+    const cacheKey = `${baseUrl}:${apiKey.slice(0, 8)}`;
+    let client = this.anthropicClients.get(cacheKey);
+    if (!client) {
+      client = new Anthropic({
+        apiKey,
+        baseURL: baseUrl !== "https://api.anthropic.com" ? baseUrl : undefined,
+      });
+      this.anthropicClients.set(cacheKey, client);
+    }
+
+    const response = await client.messages.create({
+      model,
+      max_tokens: 4096,
+      system: systemPrompt,
+      messages: messages.map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      })),
+    });
+
+    const textBlock = response.content.find((b) => b.type === "text");
+    return {
+      content: textBlock?.text ?? "",
+      tokenUsage: {
+        input: response.usage.input_tokens,
+        output: response.usage.output_tokens,
+      },
+      model,
+      provider,
+    };
+  }
+
+  // ─────────── OpenAI-Compatible (covers 90% of providers) ───────────
+
+  private async callOpenAICompatible(
+    apiKey: string,
+    baseUrl: string,
+    model: string,
+    provider: string,
+    systemPrompt: string,
+    messages: Array<{ role: string; content: string }>
+  ): Promise<ChatResponse> {
+    const url = `${baseUrl.replace(/\/$/, "")}/chat/completions`;
+
+    const body = {
+      model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...messages.map((m) => ({
+          role: m.role,
+          content: m.content,
+        })),
+      ],
+      max_tokens: 4096,
+      temperature: 0.7,
+    };
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `${provider} API error ${response.status}: ${errorText.slice(0, 500)}`
+      );
+    }
+
+    const data = (await response.json()) as {
+      choices: Array<{
+        message: { content: string; role: string };
+      }>;
+      usage?: {
+        prompt_tokens: number;
+        completion_tokens: number;
+      };
+    };
+
+    const content = data.choices?.[0]?.message?.content ?? "";
+    return {
+      content,
+      tokenUsage: {
+        input: data.usage?.prompt_tokens ?? 0,
+        output: data.usage?.completion_tokens ?? 0,
+      },
+      model,
+      provider,
+    };
+  }
+
+  // ─────────── System Prompt Builder ───────────
 
   private buildSystemPrompt(
     memoryContext: string,
@@ -102,5 +231,18 @@ ${skillsList}
 - When executing multi-step tasks, present the plan first
 - Track errors and solutions for future skill creation
 - Respect the user's tool preferences and communication style`;
+  }
+
+  private errorResponse(
+    provider: string,
+    error: string,
+    model?: string
+  ): ChatResponse {
+    return {
+      content: `[${provider}] Error: ${error}`,
+      tokenUsage: { input: 0, output: 0 },
+      model: model || "unknown",
+      provider,
+    };
   }
 }
