@@ -1,3 +1,5 @@
+[English](README.md) | [简体中文](docs/README.zh-CN.md) | [繁體中文](docs/README.zh-TW.md) | [日本語](docs/README.ja.md) | [한국어](docs/README.ko.md) | [Español](docs/README.es.md) | [Français](docs/README.fr.md) | [Deutsch](docs/README.de.md) | [Português](docs/README.pt.md) | [Русский](docs/README.ru.md) | [العربية](docs/README.ar.md)
+
 # Lume
 
 **Illuminate your workflow with AI that grows with you.**

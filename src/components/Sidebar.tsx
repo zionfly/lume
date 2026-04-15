@@ -5,9 +5,10 @@ import { useAppStore, Session } from "../stores/appStore";
 interface SidebarProps {
   onTogglePanel: (panel: "none" | "memory" | "skills") => void;
   activePanel: "none" | "memory" | "skills";
+  onOpenSettings: () => void;
 }
 
-export default function Sidebar({ onTogglePanel, activePanel }: SidebarProps) {
+export default function Sidebar({ onTogglePanel, activePanel, onOpenSettings }: SidebarProps) {
   const { sessions, setSessions, activeSessionId, setActiveSession } =
     useAppStore();
 
@@ -87,6 +88,12 @@ export default function Sidebar({ onTogglePanel, activePanel }: SidebarProps) {
           }`}
         >
           Skills
+        </button>
+        <button
+          onClick={onOpenSettings}
+          className="w-full py-1.5 px-3 rounded-lg text-sm text-left transition-colors text-gray-400 hover:bg-surface-2"
+        >
+          Settings
         </button>
       </div>
     </aside>

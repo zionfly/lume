@@ -1,6 +1,7 @@
 mod db;
 mod memory;
 mod session;
+mod sidecar;
 mod skills;
 mod commands;
 
@@ -30,6 +31,10 @@ pub fn run() {
             let skills = skills::SkillRegistry::new(&app_data)?;
             app.manage(skills);
 
+            // Initialize sidecar manager (agent process spawned on first chat)
+            let sidecar_mgr = sidecar::SidecarManager::new();
+            app.manage(sidecar_mgr);
+
             tracing::info!("Lume initialized at {:?}", app_data);
             Ok(())
         })
@@ -44,6 +49,9 @@ pub fn run() {
             commands::list_skills,
             commands::get_skill,
             commands::get_harness_stats,
+            commands::save_onboarding,
+            commands::get_settings,
+            commands::save_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Lume");

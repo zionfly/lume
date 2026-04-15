@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { useAppStore } from "../stores/appStore";
 
 const STEPS = [
@@ -77,8 +78,14 @@ export default function OnboardingWizard() {
     if (step < STEPS.length - 1) {
       setStep(step + 1);
     } else {
-      // Save onboarding data and complete
-      console.log("Onboarding complete:", answers);
+      // Persist onboarding to USER.md via Tauri backend
+      invoke("save_onboarding", {
+        data: {
+          role: answers.role || null,
+          tools: answers.tools || null,
+          model: answers.model || null,
+        },
+      }).catch(console.error);
       completeOnboarding();
     }
   };

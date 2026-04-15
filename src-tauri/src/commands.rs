@@ -1,15 +1,19 @@
 use crate::db::Database;
 use crate::memory::MemoryManager;
 use crate::session::{HarnessStats, Message, Session};
+use crate::sidecar::{ChatMessage, ChatParams, SidecarManager};
 use crate::skills::SkillRegistry;
+use serde::{Deserialize, Serialize};
 use tauri::State;
 
-/// Send a message and get AI response (placeholder — actual LLM routing happens in agent sidecar)
+// ────────────────────────── Chat ──────────────────────────
+
 #[tauri::command]
 pub async fn send_message(
     db: State<'_, Database>,
     memory: State<'_, MemoryManager>,
     skills: State<'_, SkillRegistry>,
+    sidecar: State<'_, SidecarManager>,
     session_id: String,
     content: String,
 ) -> Result<Message, String> {
@@ -23,7 +27,6 @@ pub async fn send_message(
             rusqlite::params![&msg_id, &session_id, &content],
         )
         .map_err(|e| e.to_string())?;
-
         conn.execute(
             "UPDATE sessions SET updated_at = datetime('now') WHERE id = ?1",
             rusqlite::params![&session_id],
@@ -31,30 +34,74 @@ pub async fn send_message(
         .map_err(|e| e.to_string())?;
     }
 
+    // Fetch recent messages for context
+    let history = {
+        let conn = db.conn.lock().map_err(|e| e.to_string())?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT role, content FROM messages WHERE session_id = ?1 ORDER BY created_at DESC LIMIT 20",
+            )
+            .map_err(|e| e.to_string())?;
+        let msgs: Vec<ChatMessage> = stmt
+            .query_map(rusqlite::params![&session_id], |row| {
+                Ok(ChatMessage {
+                    role: row.get(0)?,
+                    content: row.get(1)?,
+                })
+            })
+            .map_err(|e| e.to_string())?
+            .filter_map(|r| r.ok())
+            .collect();
+        msgs.into_iter().rev().collect::<Vec<_>>()
+    };
+
+    // Build memory context
+    let system_context = memory.build_system_context();
+
+    // Build L0 skill list
+    let skills_summary: Vec<String> = skills
+        .list()
+        .iter()
+        .map(|s| format!("- {}: {}", s.name, s.description))
+        .collect();
+
+    // Try sidecar, fall back to local response
+    let reply_content = match sidecar.chat(ChatParams {
+        session_id: session_id.clone(),
+        messages: history,
+        system_context,
+        skills_summary,
+    }) {
+        Ok(result) => {
+            // Handle skill auto-creation
+            if let Some(skill_update) = result.skill_update {
+                let _ = skills.save_skill(&skill_update.name, &skill_update.content);
+                tracing::info!("Auto-created skill: {}", skill_update.name);
+            }
+            result.content
+        }
+        Err(_) => {
+            // Sidecar not running — return a helpful message
+            format!(
+                "Hi! I'm Lume, your AI assistant. I received your message:\n\n> {}\n\nThe agent sidecar is not connected yet. To enable AI responses:\n\n1. Set your API key in **Settings**\n2. Or use the **Built-in Relay** (no key needed)\n\nI'll remember everything once connected.",
+                content
+            )
+        }
+    };
+
     // Record tool call for skill checkpoint
     let should_evaluate = skills.record_tool_call();
     if should_evaluate {
         tracing::info!("Skill evaluation checkpoint triggered for session {}", session_id);
     }
 
-    // Build context with memory layers
-    let _system_context = memory.build_system_context();
-
-    // Build L0 skill list for prompt
-    let _skills_summary: Vec<String> = skills
-        .list()
-        .iter()
-        .map(|s| format!("- {}: {}", s.name, s.description))
-        .collect();
-
-    // TODO: Route to agent sidecar for actual LLM inference
-    // For now, return a placeholder
+    // Store reply
     let reply_id = uuid::Uuid::new_v4().to_string();
     let reply = Message {
         id: reply_id.clone(),
         session_id: session_id.clone(),
         role: "assistant".into(),
-        content: format!("🔮 Lume is thinking... (Agent sidecar not yet connected)\n\nYour message: {}", content),
+        content: reply_content,
         tool_calls: None,
         token_count: 0,
         created_at: chrono::Utc::now().to_rfc3339(),
@@ -71,6 +118,8 @@ pub async fn send_message(
 
     Ok(reply)
 }
+
+// ────────────────────────── Sessions ──────────────────────────
 
 #[tauri::command]
 pub async fn create_session(db: State<'_, Database>, title: String) -> Result<Session, String> {
@@ -145,6 +194,8 @@ pub async fn get_session_messages(
     Ok(messages)
 }
 
+// ────────────────────────── Memory ──────────────────────────
+
 #[tauri::command]
 pub async fn get_memory_profile(
     memory: State<'_, MemoryManager>,
@@ -210,8 +261,12 @@ pub async fn search_memory(
     Ok(results)
 }
 
+// ────────────────────────── Skills ──────────────────────────
+
 #[tauri::command]
-pub async fn list_skills(skills: State<'_, SkillRegistry>) -> Result<Vec<crate::skills::SkillMeta>, String> {
+pub async fn list_skills(
+    skills: State<'_, SkillRegistry>,
+) -> Result<Vec<crate::skills::SkillMeta>, String> {
     Ok(skills.list())
 }
 
@@ -230,6 +285,8 @@ pub async fn get_skill(
             .ok_or_else(|| format!("Skill '{}' not found", name)),
     }
 }
+
+// ────────────────────────── Harness Stats ──────────────────────────
 
 #[tauri::command]
 pub async fn get_harness_stats(db: State<'_, Database>) -> Result<HarnessStats, String> {
@@ -284,4 +341,72 @@ pub async fn get_harness_stats(db: State<'_, Database>) -> Result<HarnessStats, 
         avg_tool_duration_ms,
         top_tools,
     })
+}
+
+// ────────────────────────── Onboarding ──────────────────────────
+
+#[derive(Deserialize)]
+pub struct OnboardingData {
+    pub role: Option<String>,
+    pub tools: Option<Vec<String>>,
+    pub model: Option<String>,
+}
+
+#[tauri::command]
+pub async fn save_onboarding(
+    memory: State<'_, MemoryManager>,
+    data: OnboardingData,
+) -> Result<String, String> {
+    let role = data.role.unwrap_or_else(|| "User".into());
+    let tools = data
+        .tools
+        .unwrap_or_default()
+        .join(", ");
+    let model = data.model.unwrap_or_else(|| "Built-in Relay".into());
+
+    let user_md = format!(
+        "# User Profile\n\n## Role\n- {}\n\n## Preferred Tools\n- {}\n\n## AI Model\n- {}\n\n## Communication Style\n- (learning from interactions)\n\n## Timezone\n- (auto-detected)\n",
+        role,
+        if tools.is_empty() { "(none specified)" } else { &tools },
+        model
+    );
+
+    memory.update_user(&user_md)?;
+    Ok("Onboarding saved to USER.md".into())
+}
+
+// ────────────────────────── Settings ──────────────────────────
+
+#[derive(Serialize, Deserialize)]
+pub struct AppSettings {
+    pub api_provider: String,
+    pub api_key: String,
+    pub model: String,
+    pub relay_endpoint: String,
+    pub action_preview: bool,
+}
+
+#[tauri::command]
+pub async fn get_settings(db: State<'_, Database>) -> Result<AppSettings, String> {
+    // For now, use defaults. In production, store in SQLite or tauri-plugin-store.
+    Ok(AppSettings {
+        api_provider: "relay".into(),
+        api_key: "".into(),
+        model: "claude-sonnet-4-20250514".into(),
+        relay_endpoint: "https://api.lume.dev/v1".into(),
+        action_preview: true,
+    })
+}
+
+#[tauri::command]
+pub async fn save_settings(
+    _db: State<'_, Database>,
+    settings: AppSettings,
+) -> Result<String, String> {
+    // Store in environment for sidecar to pick up
+    if !settings.api_key.is_empty() {
+        std::env::set_var("ANTHROPIC_API_KEY", &settings.api_key);
+    }
+    tracing::info!("Settings saved: provider={}, model={}", settings.api_provider, settings.model);
+    Ok("Settings saved".into())
 }

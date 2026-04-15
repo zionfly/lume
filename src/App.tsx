@@ -4,6 +4,7 @@ import ChatView from "./components/ChatView";
 import MemoryPanel from "./components/MemoryPanel";
 import SkillBrowser from "./components/SkillBrowser";
 import OnboardingWizard from "./components/OnboardingWizard";
+import Settings from "./components/Settings";
 import { useAppStore } from "./stores/appStore";
 
 type RightPanel = "none" | "memory" | "skills";
@@ -11,6 +12,7 @@ type RightPanel = "none" | "memory" | "skills";
 function App() {
   const { isOnboarded } = useAppStore();
   const [rightPanel, setRightPanel] = useState<RightPanel>("none");
+  const [showSettings, setShowSettings] = useState(false);
 
   if (!isOnboarded) {
     return <OnboardingWizard />;
@@ -18,12 +20,17 @@ function App() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar onTogglePanel={setRightPanel} activePanel={rightPanel} />
+      <Sidebar
+        onTogglePanel={setRightPanel}
+        activePanel={rightPanel}
+        onOpenSettings={() => setShowSettings(true)}
+      />
       <main className="flex-1 flex">
         <ChatView />
         {rightPanel === "memory" && <MemoryPanel />}
         {rightPanel === "skills" && <SkillBrowser />}
       </main>
+      {showSettings && <Settings onClose={() => setShowSettings(false)} />}
     </div>
   );
 }
