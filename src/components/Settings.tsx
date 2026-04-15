@@ -66,22 +66,45 @@ export default function Settings({ onClose }: SettingsProps) {
 
   const selectedProvider = getProviderById(config.provider);
 
+  // Map provider ID to login URL (same as backend, for fallback)
+  const LOGIN_URLS: Record<string, string> = {
+    anthropic: "https://console.anthropic.com/login",
+    openai: "https://platform.openai.com/login",
+    google: "https://aistudio.google.com",
+    deepseek: "https://platform.deepseek.com/sign_in",
+    mistral: "https://console.mistral.ai",
+    moonshot: "https://platform.moonshot.cn/console",
+    zhipu: "https://open.bigmodel.cn/login",
+    qwen: "https://dashscope.console.aliyun.com",
+    doubao: "https://console.volcengine.com/ark",
+    baichuan: "https://platform.baichuan-ai.com",
+    minimax: "https://www.minimaxi.com/platform",
+    stepfun: "https://platform.stepfun.com",
+    yi: "https://platform.lingyiwanwu.com",
+    groq: "https://console.groq.com",
+    together: "https://api.together.xyz",
+    openrouter: "https://openrouter.ai/settings/keys",
+    siliconflow: "https://cloud.siliconflow.cn",
+  };
+
   const handleOAuthLogin = async (providerId: string) => {
     setAuthStatus((s) => ({ ...s, [providerId]: "loading" }));
     try {
+      // Try Tauri backend first (uses open::that)
       await invoke("open_provider_auth", { provider: providerId });
-      // Provider's key page is now open in browser.
-      // User will copy the key and paste it. We show the key input.
-    } catch (err) {
-      console.error("OAuth failed:", err);
+    } catch {
+      // Fallback: open URL directly from webview
+      const url = LOGIN_URLS[providerId];
+      if (url) {
+        window.open(url, "_blank");
+      }
     } finally {
-      // After 2s, reset to show the key input
       setTimeout(() => {
         setAuthStatus((s) => ({
           ...s,
           [providerId]: config.apiKey ? "connected" : "none",
         }));
-      }, 1000);
+      }, 1500);
     }
   };
 

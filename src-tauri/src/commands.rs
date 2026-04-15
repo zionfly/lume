@@ -426,20 +426,26 @@ pub async fn start_oauth(
 /// Open provider's API key page or OAuth URL in default browser
 #[tauri::command]
 pub async fn open_provider_auth(provider: String) -> Result<String, String> {
+    // Jump to each platform's login/dashboard page (not directly to API keys).
+    // Users log in with their existing account (Google SSO etc.), then navigate to keys.
     let url = match provider.as_str() {
-        "anthropic" => "https://console.anthropic.com/settings/keys",
-        "openai" => "https://platform.openai.com/api-keys",
-        "google" => "https://aistudio.google.com/apikey",
-        "deepseek" => "https://platform.deepseek.com/api_keys",
-        "mistral" => "https://console.mistral.ai/api-keys",
-        "moonshot" => "https://platform.moonshot.cn/console/api-keys",
-        "zhipu" => "https://open.bigmodel.cn/usercenter/apikeys",
-        "qwen" => "https://dashscope.console.aliyun.com/apiKey",
-        "baichuan" => "https://platform.baichuan-ai.com/console/apikey",
-        "groq" => "https://console.groq.com/keys",
-        "together" => "https://api.together.xyz/settings/api-keys",
-        "openrouter" => "https://openrouter.ai/keys",
-        "siliconflow" => "https://cloud.siliconflow.cn/account/ak",
+        "anthropic" => "https://console.anthropic.com/login",
+        "openai" => "https://platform.openai.com/login",
+        "google" => "https://aistudio.google.com",
+        "deepseek" => "https://platform.deepseek.com/sign_in",
+        "mistral" => "https://console.mistral.ai",
+        "moonshot" => "https://platform.moonshot.cn/console",
+        "zhipu" => "https://open.bigmodel.cn/login",
+        "qwen" => "https://dashscope.console.aliyun.com",
+        "doubao" => "https://console.volcengine.com/ark",
+        "baichuan" => "https://platform.baichuan-ai.com",
+        "minimax" => "https://www.minimaxi.com/platform",
+        "stepfun" => "https://platform.stepfun.com",
+        "yi" => "https://platform.lingyiwanwu.com",
+        "groq" => "https://console.groq.com",
+        "together" => "https://api.together.xyz",
+        "openrouter" => "https://openrouter.ai/settings/keys",
+        "siliconflow" => "https://cloud.siliconflow.cn",
         _ => return Err(format!("Unknown provider: {}", provider)),
     };
 
