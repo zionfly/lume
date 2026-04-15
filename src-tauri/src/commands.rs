@@ -1,5 +1,6 @@
 use crate::db::Database;
 use crate::memory::MemoryManager;
+use crate::oauth::OAuthManager;
 use crate::session::{HarnessStats, Message, Session};
 use crate::sidecar::{ChatMessage, ChatParams, SidecarManager};
 use crate::skills::SkillRegistry;
@@ -409,4 +410,172 @@ pub async fn save_settings(
     }
     tracing::info!("Settings saved: provider={}, model={}", settings.api_provider, settings.model);
     Ok("Settings saved".into())
+}
+
+// ────────────────────────── OAuth ──────────────────────────
+
+/// Start OAuth flow: returns the auth URL to open in browser
+#[tauri::command]
+pub async fn start_oauth(
+    oauth: State<'_, OAuthManager>,
+    provider: String,
+) -> Result<String, String> {
+    oauth.start_flow(&provider)
+}
+
+/// Open provider's API key page or OAuth URL in default browser
+#[tauri::command]
+pub async fn open_provider_auth(provider: String) -> Result<String, String> {
+    let url = match provider.as_str() {
+        "anthropic" => "https://console.anthropic.com/settings/keys",
+        "openai" => "https://platform.openai.com/api-keys",
+        "google" => "https://aistudio.google.com/apikey",
+        "deepseek" => "https://platform.deepseek.com/api_keys",
+        "mistral" => "https://console.mistral.ai/api-keys",
+        "moonshot" => "https://platform.moonshot.cn/console/api-keys",
+        "zhipu" => "https://open.bigmodel.cn/usercenter/apikeys",
+        "qwen" => "https://dashscope.console.aliyun.com/apiKey",
+        "baichuan" => "https://platform.baichuan-ai.com/console/apikey",
+        "groq" => "https://console.groq.com/keys",
+        "together" => "https://api.together.xyz/settings/api-keys",
+        "openrouter" => "https://openrouter.ai/keys",
+        "siliconflow" => "https://cloud.siliconflow.cn/account/ak",
+        _ => return Err(format!("Unknown provider: {}", provider)),
+    };
+
+    // Open in default browser
+    open::that(url).map_err(|e| format!("Failed to open browser: {}", e))?;
+    Ok(url.to_string())
+}
+
+// ────────────────────────── Connection Test ──────────────────────────
+
+#[derive(Serialize)]
+pub struct ConnectionTestResult {
+    pub success: bool,
+    pub message: String,
+    pub latency_ms: u64,
+}
+
+/// Test API key connectivity by making a minimal API call
+#[tauri::command]
+pub async fn test_connection(
+    provider: String,
+    api_key: String,
+    model: String,
+    base_url: Option<String>,
+) -> Result<ConnectionTestResult, String> {
+    let start = std::time::Instant::now();
+
+    // Determine the test endpoint
+    let (url, headers, body) = match provider.as_str() {
+        "anthropic" => {
+            let url = format!(
+                "{}/v1/messages",
+                base_url.unwrap_or_else(|| "https://api.anthropic.com".into())
+            );
+            let body = serde_json::json!({
+                "model": model,
+                "max_tokens": 1,
+                "messages": [{"role": "user", "content": "hi"}]
+            });
+            (
+                url,
+                vec![
+                    ("x-api-key".to_string(), api_key.clone()),
+                    ("anthropic-version".to_string(), "2023-06-01".to_string()),
+                    ("content-type".to_string(), "application/json".to_string()),
+                ],
+                body,
+            )
+        }
+        _ => {
+            // OpenAI-compatible format for all other providers
+            let default_base = match provider.as_str() {
+                "openai" => "https://api.openai.com/v1",
+                "google" => "https://generativelanguage.googleapis.com/v1beta/openai",
+                "deepseek" => "https://api.deepseek.com/v1",
+                "zhipu" => "https://open.bigmodel.cn/api/paas/v4",
+                "moonshot" => "https://api.moonshot.cn/v1",
+                "qwen" => "https://dashscope.aliyuncs.com/compatible-mode/v1",
+                "doubao" => "https://ark.cn-beijing.volces.com/api/v3",
+                "mistral" => "https://api.mistral.ai/v1",
+                "groq" => "https://api.groq.com/openai/v1",
+                "openrouter" => "https://openrouter.ai/api/v1",
+                "siliconflow" => "https://api.siliconflow.cn/v1",
+                "baichuan" => "https://api.baichuan-ai.com/v1",
+                "minimax" => "https://api.minimax.chat/v1",
+                "stepfun" => "https://api.stepfun.com/v1",
+                "yi" => "https://api.lingyiwanwu.com/v1",
+                "together" => "https://api.together.xyz/v1",
+                _ => "http://localhost:11434/v1",
+            };
+            let base = base_url.unwrap_or_else(|| default_base.to_string());
+            let url = format!("{}/chat/completions", base.trim_end_matches('/'));
+            let body = serde_json::json!({
+                "model": model,
+                "max_tokens": 1,
+                "messages": [{"role": "user", "content": "hi"}]
+            });
+            (
+                url,
+                vec![
+                    ("Authorization".to_string(), format!("Bearer {}", api_key)),
+                    ("Content-Type".to_string(), "application/json".to_string()),
+                ],
+                body,
+            )
+        }
+    };
+
+    // Make the request
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let mut req = client.post(&url);
+    for (key, value) in &headers {
+        req = req.header(key, value);
+    }
+    req = req.json(&body);
+
+    match req.send().await {
+        Ok(resp) => {
+            let latency = start.elapsed().as_millis() as u64;
+            let status = resp.status().as_u16();
+            if status == 200 || status == 201 {
+                Ok(ConnectionTestResult {
+                    success: true,
+                    message: format!("Connected! ({}ms)", latency),
+                    latency_ms: latency,
+                })
+            } else {
+                let error_text = resp.text().await.unwrap_or_default();
+                // 400/401 with a proper error body still means the endpoint is reachable
+                // 401 = wrong key, 400 = bad request but server is alive
+                if status == 401 {
+                    Ok(ConnectionTestResult {
+                        success: false,
+                        message: "Invalid API key".into(),
+                        latency_ms: latency,
+                    })
+                } else {
+                    Ok(ConnectionTestResult {
+                        success: false,
+                        message: format!("HTTP {}: {}", status, error_text.chars().take(200).collect::<String>()),
+                        latency_ms: latency,
+                    })
+                }
+            }
+        }
+        Err(e) => {
+            let latency = start.elapsed().as_millis() as u64;
+            Ok(ConnectionTestResult {
+                success: false,
+                message: format!("Connection failed: {}", e),
+                latency_ms: latency,
+            })
+        }
+    }
 }

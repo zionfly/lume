@@ -3,6 +3,7 @@
  *
  * Supports all mainstream LLM platforms with a unified interface.
  * Each provider adapter normalizes request/response to a common format.
+ * 5-8 latest models per provider.
  */
 
 export interface ProviderConfig {
@@ -18,11 +19,9 @@ export interface ModelInfo {
   id: string;
   name: string;
   contextWindow: number;
-  tier: string;
 }
 
 export const PROVIDERS: ProviderConfig[] = [
-  // ──────────── Tier 1: Global Leaders ────────────
   {
     id: "anthropic",
     name: "Anthropic",
@@ -30,9 +29,12 @@ export const PROVIDERS: ProviderConfig[] = [
     apiKeyEnv: "ANTHROPIC_API_KEY",
     format: "anthropic",
     models: [
-      { id: "claude-opus-4-20250514", name: "Claude Opus 4", contextWindow: 200000, tier: "Most capable" },
-      { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", contextWindow: 200000, tier: "Balanced" },
-      { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", contextWindow: 200000, tier: "Fast" },
+      { id: "claude-opus-4-6", name: "Claude Opus 4.6", contextWindow: 1000000 },
+      { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6", contextWindow: 200000 },
+      { id: "claude-opus-4-20250514", name: "Claude Opus 4", contextWindow: 200000 },
+      { id: "claude-sonnet-4-20250514", name: "Claude Sonnet 4", contextWindow: 200000 },
+      { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", contextWindow: 200000 },
+      { id: "claude-sonnet-4-5-20250514", name: "Claude Sonnet 4.5", contextWindow: 200000 },
     ],
   },
   {
@@ -42,10 +44,14 @@ export const PROVIDERS: ProviderConfig[] = [
     apiKeyEnv: "OPENAI_API_KEY",
     format: "openai",
     models: [
-      { id: "gpt-4o", name: "GPT-4o", contextWindow: 128000, tier: "Flagship" },
-      { id: "gpt-4o-mini", name: "GPT-4o Mini", contextWindow: 128000, tier: "Fast & cheap" },
-      { id: "o3", name: "o3", contextWindow: 200000, tier: "Reasoning" },
-      { id: "o4-mini", name: "o4-mini", contextWindow: 200000, tier: "Reasoning (fast)" },
+      { id: "gpt-5.4", name: "GPT-5.4", contextWindow: 200000 },
+      { id: "gpt-5.4-mini", name: "GPT-5.4 Mini", contextWindow: 200000 },
+      { id: "gpt-5", name: "GPT-5", contextWindow: 200000 },
+      { id: "gpt-4o", name: "GPT-4o", contextWindow: 128000 },
+      { id: "gpt-4o-mini", name: "GPT-4o Mini", contextWindow: 128000 },
+      { id: "o4-mini", name: "o4-mini", contextWindow: 200000 },
+      { id: "o3", name: "o3", contextWindow: 200000 },
+      { id: "o3-mini", name: "o3-mini", contextWindow: 200000 },
     ],
   },
   {
@@ -55,12 +61,14 @@ export const PROVIDERS: ProviderConfig[] = [
     apiKeyEnv: "GOOGLE_API_KEY",
     format: "openai",
     models: [
-      { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", contextWindow: 1000000, tier: "Most capable" },
-      { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", contextWindow: 1000000, tier: "Fast" },
+      { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", contextWindow: 1000000 },
+      { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", contextWindow: 1000000 },
+      { id: "gemini-2.0-pro", name: "Gemini 2.0 Pro", contextWindow: 1000000 },
+      { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash", contextWindow: 1000000 },
+      { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro", contextWindow: 2000000 },
+      { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash", contextWindow: 1000000 },
     ],
   },
-
-  // ──────────── Tier 2: China Domestic ────────────
   {
     id: "deepseek",
     name: "DeepSeek",
@@ -68,8 +76,11 @@ export const PROVIDERS: ProviderConfig[] = [
     apiKeyEnv: "DEEPSEEK_API_KEY",
     format: "openai",
     models: [
-      { id: "deepseek-chat", name: "DeepSeek V3", contextWindow: 64000, tier: "Balanced" },
-      { id: "deepseek-reasoner", name: "DeepSeek R1", contextWindow: 64000, tier: "Reasoning" },
+      { id: "deepseek-chat", name: "DeepSeek V3", contextWindow: 64000 },
+      { id: "deepseek-reasoner", name: "DeepSeek R1", contextWindow: 64000 },
+      { id: "deepseek-r1-0528", name: "DeepSeek R1-0528", contextWindow: 64000 },
+      { id: "deepseek-v2.5", name: "DeepSeek V2.5", contextWindow: 32000 },
+      { id: "deepseek-coder", name: "DeepSeek Coder", contextWindow: 16000 },
     ],
   },
   {
@@ -79,9 +90,12 @@ export const PROVIDERS: ProviderConfig[] = [
     apiKeyEnv: "ZHIPU_API_KEY",
     format: "openai",
     models: [
-      { id: "glm-4-plus", name: "GLM-4 Plus", contextWindow: 128000, tier: "Most capable" },
-      { id: "glm-4-flash", name: "GLM-4 Flash", contextWindow: 128000, tier: "Fast & free" },
-      { id: "glm-4-long", name: "GLM-4 Long", contextWindow: 1000000, tier: "Long context" },
+      { id: "glm-4-plus", name: "GLM-4 Plus", contextWindow: 128000 },
+      { id: "glm-4-air", name: "GLM-4 Air", contextWindow: 128000 },
+      { id: "glm-4-airx", name: "GLM-4 AirX", contextWindow: 8000 },
+      { id: "glm-4-flash", name: "GLM-4 Flash", contextWindow: 128000 },
+      { id: "glm-4-long", name: "GLM-4 Long", contextWindow: 1000000 },
+      { id: "glm-4v-plus", name: "GLM-4V Plus", contextWindow: 8000 },
     ],
   },
   {
@@ -91,9 +105,11 @@ export const PROVIDERS: ProviderConfig[] = [
     apiKeyEnv: "MOONSHOT_API_KEY",
     format: "openai",
     models: [
-      { id: "moonshot-v1-128k", name: "Kimi 128K", contextWindow: 128000, tier: "Long context" },
-      { id: "moonshot-v1-32k", name: "Kimi 32K", contextWindow: 32000, tier: "Balanced" },
-      { id: "moonshot-v1-8k", name: "Kimi 8K", contextWindow: 8000, tier: "Fast" },
+      { id: "moonshot-v1-auto", name: "Kimi Auto", contextWindow: 128000 },
+      { id: "moonshot-v1-128k", name: "Kimi 128K", contextWindow: 128000 },
+      { id: "moonshot-v1-32k", name: "Kimi 32K", contextWindow: 32000 },
+      { id: "moonshot-v1-8k", name: "Kimi 8K", contextWindow: 8000 },
+      { id: "kimi-latest", name: "Kimi Latest", contextWindow: 128000 },
     ],
   },
   {
@@ -103,57 +119,30 @@ export const PROVIDERS: ProviderConfig[] = [
     apiKeyEnv: "DASHSCOPE_API_KEY",
     format: "openai",
     models: [
-      { id: "qwen-max", name: "Qwen Max", contextWindow: 32000, tier: "Most capable" },
-      { id: "qwen-plus", name: "Qwen Plus", contextWindow: 131072, tier: "Balanced" },
-      { id: "qwen-turbo", name: "Qwen Turbo", contextWindow: 131072, tier: "Fast" },
-      { id: "qwen-long", name: "Qwen Long", contextWindow: 10000000, tier: "Long context" },
+      { id: "qwen-max", name: "Qwen Max", contextWindow: 32000 },
+      { id: "qwen-plus", name: "Qwen Plus", contextWindow: 131072 },
+      { id: "qwen-turbo", name: "Qwen Turbo", contextWindow: 131072 },
+      { id: "qwen-long", name: "Qwen Long", contextWindow: 10000000 },
+      { id: "qwen-vl-max", name: "Qwen VL Max", contextWindow: 32000 },
+      { id: "qwen-coder-plus", name: "Qwen Coder Plus", contextWindow: 131072 },
+      { id: "qwen2.5-72b-instruct", name: "Qwen 2.5 72B", contextWindow: 32000 },
     ],
   },
   {
-    id: "baichuan",
-    name: "Baichuan",
-    baseUrl: "https://api.baichuan-ai.com/v1",
-    apiKeyEnv: "BAICHUAN_API_KEY",
+    id: "doubao",
+    name: "Doubao (ByteDance)",
+    baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
+    apiKeyEnv: "ARK_API_KEY",
     format: "openai",
     models: [
-      { id: "Baichuan4", name: "Baichuan 4", contextWindow: 32000, tier: "Most capable" },
-      { id: "Baichuan3-Turbo-128k", name: "Baichuan 3 Turbo 128K", contextWindow: 128000, tier: "Fast" },
+      { id: "doubao-1.5-pro-256k", name: "Doubao 1.5 Pro 256K", contextWindow: 256000 },
+      { id: "doubao-1.5-pro-32k", name: "Doubao 1.5 Pro 32K", contextWindow: 32000 },
+      { id: "doubao-1.5-lite-32k", name: "Doubao 1.5 Lite 32K", contextWindow: 32000 },
+      { id: "doubao-pro-256k", name: "Doubao Pro 256K", contextWindow: 256000 },
+      { id: "doubao-lite-128k", name: "Doubao Lite 128K", contextWindow: 128000 },
+      { id: "doubao-vision-pro-32k", name: "Doubao Vision Pro", contextWindow: 32000 },
     ],
   },
-  {
-    id: "minimax",
-    name: "MiniMax",
-    baseUrl: "https://api.minimax.chat/v1",
-    apiKeyEnv: "MINIMAX_API_KEY",
-    format: "openai",
-    models: [
-      { id: "abab6.5s-chat", name: "abab 6.5s", contextWindow: 245760, tier: "Most capable" },
-    ],
-  },
-  {
-    id: "stepfun",
-    name: "StepFun",
-    baseUrl: "https://api.stepfun.com/v1",
-    apiKeyEnv: "STEPFUN_API_KEY",
-    format: "openai",
-    models: [
-      { id: "step-2-16k", name: "Step 2 16K", contextWindow: 16000, tier: "Most capable" },
-      { id: "step-1-128k", name: "Step 1 128K", contextWindow: 128000, tier: "Long context" },
-    ],
-  },
-  {
-    id: "yi",
-    name: "Yi (01.AI)",
-    baseUrl: "https://api.lingyiwanwu.com/v1",
-    apiKeyEnv: "YI_API_KEY",
-    format: "openai",
-    models: [
-      { id: "yi-large", name: "Yi Large", contextWindow: 32000, tier: "Most capable" },
-      { id: "yi-medium", name: "Yi Medium", contextWindow: 16000, tier: "Balanced" },
-    ],
-  },
-
-  // ──────────── Tier 3: Specialized / Open-Source Hosts ────────────
   {
     id: "mistral",
     name: "Mistral AI",
@@ -161,9 +150,12 @@ export const PROVIDERS: ProviderConfig[] = [
     apiKeyEnv: "MISTRAL_API_KEY",
     format: "openai",
     models: [
-      { id: "mistral-large-latest", name: "Mistral Large", contextWindow: 128000, tier: "Most capable" },
-      { id: "mistral-medium-latest", name: "Mistral Medium", contextWindow: 32000, tier: "Balanced" },
-      { id: "codestral-latest", name: "Codestral", contextWindow: 32000, tier: "Code" },
+      { id: "mistral-large-latest", name: "Mistral Large", contextWindow: 128000 },
+      { id: "mistral-medium-latest", name: "Mistral Medium", contextWindow: 32000 },
+      { id: "mistral-small-latest", name: "Mistral Small", contextWindow: 32000 },
+      { id: "codestral-latest", name: "Codestral", contextWindow: 32000 },
+      { id: "pixtral-large-latest", name: "Pixtral Large", contextWindow: 128000 },
+      { id: "mistral-embed", name: "Mistral Embed", contextWindow: 8000 },
     ],
   },
   {
@@ -173,23 +165,13 @@ export const PROVIDERS: ProviderConfig[] = [
     apiKeyEnv: "GROQ_API_KEY",
     format: "openai",
     models: [
-      { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B", contextWindow: 128000, tier: "Fast open-source" },
-      { id: "mixtral-8x7b-32768", name: "Mixtral 8x7B", contextWindow: 32000, tier: "Fast MoE" },
+      { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B", contextWindow: 128000 },
+      { id: "llama-3.1-8b-instant", name: "Llama 3.1 8B", contextWindow: 128000 },
+      { id: "mixtral-8x7b-32768", name: "Mixtral 8x7B", contextWindow: 32000 },
+      { id: "gemma2-9b-it", name: "Gemma 2 9B", contextWindow: 8000 },
+      { id: "deepseek-r1-distill-llama-70b", name: "DeepSeek R1 Llama 70B", contextWindow: 128000 },
     ],
   },
-  {
-    id: "together",
-    name: "Together AI",
-    baseUrl: "https://api.together.xyz/v1",
-    apiKeyEnv: "TOGETHER_API_KEY",
-    format: "openai",
-    models: [
-      { id: "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo", name: "Llama 3.1 405B", contextWindow: 128000, tier: "Largest open-source" },
-      { id: "Qwen/Qwen2.5-72B-Instruct-Turbo", name: "Qwen 2.5 72B", contextWindow: 32000, tier: "Strong open-source" },
-    ],
-  },
-
-  // ──────────── Tier 4: Aggregators / Relays ────────────
   {
     id: "openrouter",
     name: "OpenRouter",
@@ -197,10 +179,13 @@ export const PROVIDERS: ProviderConfig[] = [
     apiKeyEnv: "OPENROUTER_API_KEY",
     format: "openai",
     models: [
-      { id: "anthropic/claude-sonnet-4", name: "Claude Sonnet 4 (via OR)", contextWindow: 200000, tier: "Relay" },
-      { id: "openai/gpt-4o", name: "GPT-4o (via OR)", contextWindow: 128000, tier: "Relay" },
-      { id: "google/gemini-2.5-pro", name: "Gemini 2.5 Pro (via OR)", contextWindow: 1000000, tier: "Relay" },
-      { id: "deepseek/deepseek-chat", name: "DeepSeek V3 (via OR)", contextWindow: 64000, tier: "Relay" },
+      { id: "anthropic/claude-opus-4.6", name: "Claude Opus 4.6", contextWindow: 1000000 },
+      { id: "anthropic/claude-sonnet-4.6", name: "Claude Sonnet 4.6", contextWindow: 200000 },
+      { id: "openai/gpt-5.4", name: "GPT-5.4", contextWindow: 200000 },
+      { id: "openai/gpt-4o", name: "GPT-4o", contextWindow: 128000 },
+      { id: "google/gemini-2.5-pro", name: "Gemini 2.5 Pro", contextWindow: 1000000 },
+      { id: "deepseek/deepseek-chat", name: "DeepSeek V3", contextWindow: 64000 },
+      { id: "meta-llama/llama-3.3-70b-instruct", name: "Llama 3.3 70B", contextWindow: 128000 },
     ],
   },
   {
@@ -210,13 +195,13 @@ export const PROVIDERS: ProviderConfig[] = [
     apiKeyEnv: "SILICONFLOW_API_KEY",
     format: "openai",
     models: [
-      { id: "deepseek-ai/DeepSeek-V3", name: "DeepSeek V3", contextWindow: 64000, tier: "Relay" },
-      { id: "Qwen/Qwen2.5-72B-Instruct", name: "Qwen 2.5 72B", contextWindow: 32000, tier: "Relay" },
-      { id: "Pro/deepseek-ai/DeepSeek-R1", name: "DeepSeek R1", contextWindow: 64000, tier: "Relay" },
+      { id: "deepseek-ai/DeepSeek-V3", name: "DeepSeek V3", contextWindow: 64000 },
+      { id: "Pro/deepseek-ai/DeepSeek-R1", name: "DeepSeek R1", contextWindow: 64000 },
+      { id: "Qwen/Qwen2.5-72B-Instruct", name: "Qwen 2.5 72B", contextWindow: 32000 },
+      { id: "Qwen/Qwen2.5-Coder-32B-Instruct", name: "Qwen 2.5 Coder 32B", contextWindow: 32000 },
+      { id: "THUDM/glm-4-9b-chat", name: "GLM-4 9B", contextWindow: 128000 },
     ],
   },
-
-  // ──────────── Custom / Self-hosted ────────────
   {
     id: "custom",
     name: "Custom (OpenAI-compatible)",
@@ -224,15 +209,11 @@ export const PROVIDERS: ProviderConfig[] = [
     apiKeyEnv: "CUSTOM_API_KEY",
     format: "openai",
     models: [
-      { id: "custom-model", name: "Custom Model", contextWindow: 8000, tier: "Self-hosted" },
+      { id: "custom-model", name: "Custom Model", contextWindow: 8000 },
     ],
   },
 ];
 
 export function getProvider(id: string): ProviderConfig | undefined {
   return PROVIDERS.find((p) => p.id === id);
-}
-
-export function getProviderForModel(modelId: string): ProviderConfig | undefined {
-  return PROVIDERS.find((p) => p.models.some((m) => m.id === modelId));
 }

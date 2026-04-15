@@ -1,5 +1,6 @@
 mod db;
 mod memory;
+mod oauth;
 mod session;
 mod sidecar;
 mod skills;
@@ -35,6 +36,10 @@ pub fn run() {
             let sidecar_mgr = sidecar::SidecarManager::new();
             app.manage(sidecar_mgr);
 
+            // OAuth manager for provider authentication
+            let oauth_mgr = oauth::OAuthManager::new();
+            app.manage(oauth_mgr);
+
             tracing::info!("Lume initialized at {:?}", app_data);
             Ok(())
         })
@@ -52,6 +57,9 @@ pub fn run() {
             commands::save_onboarding,
             commands::get_settings,
             commands::save_settings,
+            commands::start_oauth,
+            commands::open_provider_auth,
+            commands::test_connection,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Lume");
