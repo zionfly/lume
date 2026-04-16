@@ -14,9 +14,12 @@ pub async fn send_message(
     db: State<'_, Database>,
     memory: State<'_, MemoryManager>,
     skills: State<'_, SkillRegistry>,
-    sidecar: State<'_, SidecarManager>,
     session_id: String,
     content: String,
+    provider: Option<String>,
+    model: Option<String>,
+    api_key: Option<String>,
+    base_url: Option<String>,
 ) -> Result<Message, String> {
     let msg_id = uuid::Uuid::new_v4().to_string();
 
@@ -36,59 +39,67 @@ pub async fn send_message(
     }
 
     // Fetch recent messages for context
-    let history = {
+    let history: Vec<serde_json::Value> = {
         let conn = db.conn.lock().map_err(|e| e.to_string())?;
         let mut stmt = conn
             .prepare(
                 "SELECT role, content FROM messages WHERE session_id = ?1 ORDER BY created_at DESC LIMIT 20",
             )
             .map_err(|e| e.to_string())?;
-        let msgs: Vec<ChatMessage> = stmt
+        let msgs: Vec<(String, String)> = stmt
             .query_map(rusqlite::params![&session_id], |row| {
-                Ok(ChatMessage {
-                    role: row.get(0)?,
-                    content: row.get(1)?,
-                })
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
             })
             .map_err(|e| e.to_string())?
             .filter_map(|r| r.ok())
             .collect();
-        msgs.into_iter().rev().collect::<Vec<_>>()
+        msgs.into_iter().rev()
+            .map(|(role, content)| serde_json::json!({"role": role, "content": content}))
+            .collect()
     };
 
-    // Build memory context
+    // Build memory context + skills summary for system prompt
     let system_context = memory.build_system_context();
-
-    // Build L0 skill list
-    let skills_summary: Vec<String> = skills
+    let skills_list: Vec<String> = skills
         .list()
         .iter()
         .map(|s| format!("- {}: {}", s.name, s.description))
         .collect();
-
-    // Try sidecar, fall back to local response
-    let reply_content = match sidecar.chat(ChatParams {
-        session_id: session_id.clone(),
-        messages: history,
-        system_context,
-        skills_summary,
-    }) {
-        Ok(result) => {
-            // Handle skill auto-creation
-            if let Some(skill_update) = result.skill_update {
-                let _ = skills.save_skill(&skill_update.name, &skill_update.content);
-                tracing::info!("Auto-created skill: {}", skill_update.name);
-            }
-            result.content
-        }
-        Err(_) => {
-            // Sidecar not running — return a helpful message
-            format!(
-                "Hi! I'm Lume, your AI assistant. I received your message:\n\n> {}\n\nThe agent sidecar is not connected yet. To enable AI responses:\n\n1. Set your API key in **Settings**\n2. Or use the **Built-in Relay** (no key needed)\n\nI'll remember everything once connected.",
-                content
-            )
-        }
+    let skills_block = if skills_list.is_empty() {
+        String::new()
+    } else {
+        format!("\n<available_skills>\n{}\n</available_skills>", skills_list.join("\n"))
     };
+
+    let system_prompt = format!(
+        "You are Lume, an AI assistant that illuminates the user's workflow. \
+         You grow smarter with every interaction through your memory and skill systems.\n\n\
+         {}\n{}\n\n\
+         Be concise and direct. Show your reasoning for non-trivial decisions.",
+        system_context, skills_block
+    );
+
+    // Direct API call using saved settings
+    let provider_id = provider.unwrap_or_else(|| "openai".into());
+    let model_id = model.unwrap_or_else(|| "gpt-4o".into());
+    let key = api_key.unwrap_or_default();
+
+    if key.is_empty() {
+        return Ok(Message {
+            id: uuid::Uuid::new_v4().to_string(),
+            session_id: session_id.clone(),
+            role: "assistant".into(),
+            content: "No API key configured. Go to **Settings** to connect a provider.".into(),
+            tool_calls: None,
+            token_count: 0,
+            created_at: chrono::Utc::now().to_rfc3339(),
+        });
+    }
+
+    let reply_content = call_llm_direct(
+        &provider_id, &model_id, &key, base_url.as_deref(),
+        &system_prompt, &history,
+    ).await?;
 
     // Record tool call for skill checkpoint
     let should_evaluate = skills.record_tool_call();
@@ -445,6 +456,117 @@ pub async fn poll_oauth_result(
     oauth: State<'_, OAuthManager>,
 ) -> Result<Option<crate::oauth::OAuthResult>, String> {
     Ok(oauth.get_result())
+}
+
+// ────────────────────────── Direct LLM Call ──────────────────────────
+
+async fn call_llm_direct(
+    provider: &str,
+    model: &str,
+    api_key: &str,
+    base_url: Option<&str>,
+    system_prompt: &str,
+    history: &[serde_json::Value],
+) -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(60))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    if provider == "anthropic" {
+        // Anthropic Messages API
+        let url = format!(
+            "{}/v1/messages",
+            base_url.unwrap_or("https://api.anthropic.com")
+        );
+        let body = serde_json::json!({
+            "model": model,
+            "max_tokens": 4096,
+            "system": system_prompt,
+            "messages": history,
+        });
+
+        let resp = client
+            .post(&url)
+            .header("x-api-key", api_key)
+            .header("anthropic-version", "2023-06-01")
+            .header("content-type", "application/json")
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("API request failed: {}", e))?;
+
+        if !resp.status().is_success() {
+            let status = resp.status().as_u16();
+            let text = resp.text().await.unwrap_or_default();
+            return Err(format!("Anthropic API error {}: {}", status, &text[..text.len().min(300)]));
+        }
+
+        let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+        let content = json["content"]
+            .as_array()
+            .and_then(|arr| arr.first())
+            .and_then(|block| block["text"].as_str())
+            .unwrap_or("(empty response)")
+            .to_string();
+        Ok(content)
+    } else {
+        // OpenAI-compatible format (covers OpenAI, DeepSeek, Gemini, etc.)
+        let default_base = match provider {
+            "openai" => "https://api.openai.com/v1",
+            "google" => "https://generativelanguage.googleapis.com/v1beta/openai",
+            "deepseek" => "https://api.deepseek.com/v1",
+            "zhipu" => "https://open.bigmodel.cn/api/paas/v4",
+            "moonshot" => "https://api.moonshot.cn/v1",
+            "qwen" => "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "doubao" => "https://ark.cn-beijing.volces.com/api/v3",
+            "mistral" => "https://api.mistral.ai/v1",
+            "groq" => "https://api.groq.com/openai/v1",
+            "openrouter" => "https://openrouter.ai/api/v1",
+            "siliconflow" => "https://api.siliconflow.cn/v1",
+            "baichuan" => "https://api.baichuan-ai.com/v1",
+            "minimax" => "https://api.minimax.chat/v1",
+            "stepfun" => "https://api.stepfun.com/v1",
+            "yi" => "https://api.lingyiwanwu.com/v1",
+            "together" => "https://api.together.xyz/v1",
+            _ => "http://localhost:11434/v1",
+        };
+        let base = base_url.unwrap_or(default_base);
+        let url = format!("{}/chat/completions", base.trim_end_matches('/'));
+
+        let mut messages = vec![serde_json::json!({"role": "system", "content": system_prompt})];
+        messages.extend_from_slice(history);
+
+        let body = serde_json::json!({
+            "model": model,
+            "max_tokens": 4096,
+            "messages": messages,
+        });
+
+        let resp = client
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Content-Type", "application/json")
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("API request failed: {}", e))?;
+
+        if !resp.status().is_success() {
+            let status = resp.status().as_u16();
+            let text = resp.text().await.unwrap_or_default();
+            return Err(format!("API error {}: {}", status, &text[..text.len().min(300)]));
+        }
+
+        let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+        let content = json["choices"]
+            .as_array()
+            .and_then(|arr| arr.first())
+            .and_then(|choice| choice["message"]["content"].as_str())
+            .unwrap_or("(empty response)")
+            .to_string();
+        Ok(content)
+    }
 }
 
 // ────────────────────────── Connection Test ──────────────────────────

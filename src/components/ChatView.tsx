@@ -46,9 +46,18 @@ export default function ChatView() {
     setLoading(true);
 
     try {
+      // Read saved settings to pass provider/model/apiKey
+      const settings = JSON.parse(
+        localStorage.getItem("lume_settings") || "{}"
+      );
+
       const reply = await invoke<Message>("send_message", {
         sessionId: activeSessionId,
         content: input,
+        provider: settings.provider || null,
+        model: settings.model || null,
+        apiKey: settings.apiKey || null,
+        baseUrl: settings.customBaseUrl || null,
       });
       addMessage(reply);
     } catch (err) {
