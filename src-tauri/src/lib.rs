@@ -59,6 +59,7 @@ pub fn run() {
             commands::save_settings,
             commands::start_oauth,
             commands::open_provider_auth,
+            commands::poll_oauth_result,
             commands::test_connection,
         ])
         .run(tauri::generate_context!())

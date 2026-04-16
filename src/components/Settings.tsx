@@ -90,21 +90,69 @@ export default function Settings({ onClose }: SettingsProps) {
   const handleOAuthLogin = async (providerId: string) => {
     setAuthStatus((s) => ({ ...s, [providerId]: "loading" }));
     try {
-      // Try Tauri backend first (uses open::that)
-      await invoke("open_provider_auth", { provider: providerId });
+      // Start OAuth flow (PKCE for OpenAI, browser-open for others)
+      await invoke("start_oauth", { provider: providerId });
+
+      if (providerId === "openai") {
+        // Poll for OAuth result — OpenAI returns a real token
+        const pollInterval = setInterval(async () => {
+          try {
+            const result = await invoke<{
+              provider: string;
+              access_token: string | null;
+              error: string | null;
+              status: string;
+            } | null>("poll_oauth_result");
+
+            if (result && result.status === "success" && result.access_token) {
+              clearInterval(pollInterval);
+              update({ apiKey: result.access_token });
+              setAuthStatus((s) => ({ ...s, [providerId]: "connected" }));
+              setTestResult({
+                success: true,
+                message: "Authenticated via OAuth!",
+              });
+            } else if (result && result.status === "error") {
+              clearInterval(pollInterval);
+              setAuthStatus((s) => ({ ...s, [providerId]: "none" }));
+              setTestResult({
+                success: false,
+                message: result.error || "OAuth failed",
+              });
+            }
+          } catch {
+            // ignore poll errors
+          }
+        }, 1500);
+
+        // Stop polling after 3 minutes
+        setTimeout(() => {
+          clearInterval(pollInterval);
+          setAuthStatus((s) => ({
+            ...s,
+            [providerId]:
+              s[providerId] === "loading" ? "none" : s[providerId],
+          }));
+        }, 180000);
+      } else {
+        // Non-OAuth providers: just opened browser, wait a bit
+        setTimeout(() => {
+          setAuthStatus((s) => ({
+            ...s,
+            [providerId]: config.apiKey ? "connected" : "none",
+          }));
+        }, 2000);
+      }
     } catch {
       // Fallback: open URL directly from webview
       const url = LOGIN_URLS[providerId];
-      if (url) {
-        window.open(url, "_blank");
-      }
-    } finally {
+      if (url) window.open(url, "_blank");
       setTimeout(() => {
         setAuthStatus((s) => ({
           ...s,
           [providerId]: config.apiKey ? "connected" : "none",
         }));
-      }, 1500);
+      }, 2000);
     }
   };
 
@@ -237,9 +285,13 @@ export default function Settings({ onClose }: SettingsProps) {
                       </>
                     ) : (
                       <>
-                        Sign in to {selectedProvider.name}
+                        {config.provider === "openai"
+                          ? `Sign in with OpenAI OAuth`
+                          : `Sign in to ${selectedProvider.name}`}
                         <span className="text-xs text-gray-500">
-                          (opens browser)
+                          {config.provider === "openai"
+                            ? "(auto-connects)"
+                            : "(opens browser)"}
                         </span>
                       </>
                     )}

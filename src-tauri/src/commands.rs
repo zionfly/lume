@@ -414,44 +414,37 @@ pub async fn save_settings(
 
 // ────────────────────────── OAuth ──────────────────────────
 
-/// Start OAuth flow: returns the auth URL to open in browser
+/// Start OAuth PKCE flow for providers that support it (OpenAI).
+/// For other providers, opens their login page in browser.
 #[tauri::command]
 pub async fn start_oauth(
     oauth: State<'_, OAuthManager>,
     provider: String,
 ) -> Result<String, String> {
-    oauth.start_flow(&provider)
+    match provider.as_str() {
+        "openai" => oauth.start_openai_flow(),
+        _ => oauth.start_browser_flow(&provider),
+    }
 }
 
-/// Open provider's API key page or OAuth URL in default browser
+/// Open provider's login page in default browser (for manual API key flow)
 #[tauri::command]
-pub async fn open_provider_auth(provider: String) -> Result<String, String> {
-    // Jump to each platform's login/dashboard page (not directly to API keys).
-    // Users log in with their existing account (Google SSO etc.), then navigate to keys.
-    let url = match provider.as_str() {
-        "anthropic" => "https://console.anthropic.com/login",
-        "openai" => "https://platform.openai.com/login",
-        "google" => "https://aistudio.google.com",
-        "deepseek" => "https://platform.deepseek.com/sign_in",
-        "mistral" => "https://console.mistral.ai",
-        "moonshot" => "https://platform.moonshot.cn/console",
-        "zhipu" => "https://open.bigmodel.cn/login",
-        "qwen" => "https://dashscope.console.aliyun.com",
-        "doubao" => "https://console.volcengine.com/ark",
-        "baichuan" => "https://platform.baichuan-ai.com",
-        "minimax" => "https://www.minimaxi.com/platform",
-        "stepfun" => "https://platform.stepfun.com",
-        "yi" => "https://platform.lingyiwanwu.com",
-        "groq" => "https://console.groq.com",
-        "together" => "https://api.together.xyz",
-        "openrouter" => "https://openrouter.ai/settings/keys",
-        "siliconflow" => "https://cloud.siliconflow.cn",
-        _ => return Err(format!("Unknown provider: {}", provider)),
-    };
+pub async fn open_provider_auth(
+    oauth: State<'_, OAuthManager>,
+    provider: String,
+) -> Result<String, String> {
+    match provider.as_str() {
+        "openai" => oauth.start_openai_flow(),
+        _ => oauth.start_browser_flow(&provider),
+    }
+}
 
-    // Open in default browser
-    open::that(url).map_err(|e| format!("Failed to open browser: {}", e))?;
-    Ok(url.to_string())
+/// Poll OAuth result (called by frontend after starting flow)
+#[tauri::command]
+pub async fn poll_oauth_result(
+    oauth: State<'_, OAuthManager>,
+) -> Result<Option<crate::oauth::OAuthResult>, String> {
+    Ok(oauth.get_result())
 }
 
 // ────────────────────────── Connection Test ──────────────────────────
