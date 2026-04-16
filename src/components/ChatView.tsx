@@ -74,17 +74,40 @@ export default function ChatView() {
     }
   };
 
+  const settings = JSON.parse(localStorage.getItem("lume_settings") || "{}");
+  const hasApiKey = !!settings.apiKey;
+
   if (!activeSessionId) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div className="text-center">
+        <div className="text-center max-w-md">
           <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-lume-400 to-lume-600 flex items-center justify-center">
             <span className="text-black font-bold text-2xl">L</span>
           </div>
           <h2 className="text-xl font-semibold mb-2">Welcome to Lume</h2>
-          <p className="text-gray-500 text-sm">
-            Start a new chat to illuminate your workflow
-          </p>
+          {hasApiKey ? (
+            <p className="text-gray-500 text-sm">
+              Start a new chat to illuminate your workflow
+            </p>
+          ) : (
+            <div className="space-y-3 mt-4">
+              <p className="text-gray-400 text-sm">
+                Connect an AI provider to start chatting.
+                Google Gemini is free — get a key in 10 seconds:
+              </p>
+              <a
+                href="https://aistudio.google.com/apikey"
+                target="_blank"
+                rel="noopener"
+                className="inline-block px-5 py-2.5 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-xl text-sm transition-colors"
+              >
+                Get free Gemini API Key
+              </a>
+              <p className="text-gray-600 text-xs">
+                Then paste it in Settings → Google Gemini
+              </p>
+            </div>
+          )}
         </div>
       </div>
     );

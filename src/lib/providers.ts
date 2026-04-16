@@ -61,12 +61,12 @@ export const PROVIDERS: ProviderInfo[] = [
   },
   {
     id: "google",
-    name: "Google Gemini",
+    name: "Google Gemini (Free)",
     icon: "G",
     color: "#4285f4",
     tier: "global",
     apiKeyPlaceholder: "AIza...",
-    signupUrl: "https://aistudio.google.com",
+    signupUrl: "https://aistudio.google.com/apikey",
     models: [
       // Latest (from ai.google.dev 2026-04)
       { id: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro" },

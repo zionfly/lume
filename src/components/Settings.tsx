@@ -14,8 +14,8 @@ interface SettingsConfig {
 }
 
 const DEFAULT_CONFIG: SettingsConfig = {
-  provider: "anthropic",
-  model: "claude-sonnet-4-6",
+  provider: "google",
+  model: "gemini-2.5-flash",
   apiKey: "",
   customBaseUrl: "",
   actionPreview: true,
@@ -70,7 +70,7 @@ export default function Settings({ onClose }: SettingsProps) {
   const LOGIN_URLS: Record<string, string> = {
     anthropic: "https://console.anthropic.com/login",
     openai: "https://platform.openai.com/login",
-    google: "https://aistudio.google.com",
+    google: "https://aistudio.google.com/apikey",
     deepseek: "https://platform.deepseek.com/sign_in",
     mistral: "https://console.mistral.ai",
     moonshot: "https://platform.moonshot.cn/console",
