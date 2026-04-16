@@ -14,7 +14,8 @@ use std::sync::{Arc, Mutex};
 ///   PKCE:        S256
 ///   Callback:    http://localhost:{PORT}/auth/callback
 
-const CALLBACK_PORT: u16 = 17580;
+// Must use port 1455 — this is the redirect_uri registered with OpenAI's client_id
+const CALLBACK_PORT: u16 = 1455;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct OAuthResult {
