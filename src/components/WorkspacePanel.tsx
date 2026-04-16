@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 
 interface FileEntry {
   name: string;
@@ -16,7 +17,6 @@ export default function WorkspacePanel() {
   const [currentPath, setCurrentPath] = useState("");
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState("");
-  const [pathInput, setPathInput] = useState("");
 
   useEffect(() => {
     if (workspacePath) {
@@ -43,14 +43,24 @@ export default function WorkspacePanel() {
       setSelectedFile(path);
       setFileContent(content);
     } catch (err) {
-      setFileContent(`Error reading file: ${err}`);
+      setFileContent(`Error: ${err}`);
     }
   };
 
-  const setWorkspace = () => {
-    if (pathInput.trim()) {
-      localStorage.setItem("lume_workspace", pathInput.trim());
-      setWorkspacePath(pathInput.trim());
+  const pickFolder = async () => {
+    try {
+      const selected = await open({ directory: true, multiple: false });
+      if (selected && typeof selected === "string") {
+        localStorage.setItem("lume_workspace", selected);
+        setWorkspacePath(selected);
+      }
+    } catch {
+      // Fallback: prompt for manual input
+      const path = prompt("Enter folder path:");
+      if (path) {
+        localStorage.setItem("lume_workspace", path);
+        setWorkspacePath(path);
+      }
     }
   };
 
@@ -69,75 +79,79 @@ export default function WorkspacePanel() {
 
   if (!workspacePath) {
     return (
-      <div className="w-80 bg-surface-1 border-l border-surface-3 flex flex-col">
+      <div className="h-full bg-surface-1 flex flex-col">
         <div className="p-4 border-b border-surface-3">
           <h3 className="font-semibold text-sm text-sand-900">Workspace</h3>
-          <p className="text-xs text-sand-500 mt-1">
+          <p className="text-xs text-sand-400 mt-1">
             Select a local folder to work with
           </p>
         </div>
-        <div className="p-4 space-y-3">
-          <input
-            value={pathInput}
-            onChange={(e) => setPathInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && setWorkspace()}
-            placeholder="/Users/you/project"
-            className="w-full bg-white rounded-lg px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-lume-400/50 border border-surface-3 text-sand-900"
-          />
+        <div className="p-4 space-y-3 flex-1 flex flex-col items-center justify-center">
+          <p className="text-sand-500 text-sm text-center">
+            Grant Lume access to a project folder
+          </p>
           <button
-            onClick={setWorkspace}
-            disabled={!pathInput.trim()}
-            className="w-full py-2 bg-lume-600 hover:bg-lume-700 disabled:opacity-40 text-white font-medium rounded-lg text-sm transition-colors"
+            onClick={pickFolder}
+            className="px-5 py-2.5 bg-lume-600 hover:bg-lume-700 text-white font-medium rounded-xl text-sm transition-colors"
           >
-            Open Workspace
+            Choose Folder...
           </button>
-          <div className="text-xs text-sand-400 space-y-1">
-            <p>Lume will read files in this folder to give better answers.</p>
-            <p>You can change this anytime.</p>
-          </div>
+          <p className="text-sand-400 text-xs text-center max-w-[200px]">
+            Lume reads files in this folder to give context-aware answers
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="w-80 bg-surface-1 border-l border-surface-3 flex flex-col">
+    <div className="h-full bg-surface-1 flex flex-col">
       {/* Header */}
       <div className="p-4 border-b border-surface-3">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-sm text-sand-900">Workspace</h3>
-          <button
-            onClick={() => {
-              localStorage.removeItem("lume_workspace");
-              setWorkspacePath("");
-              setEntries([]);
-            }}
-            className="text-xs text-sand-400 hover:text-red-500"
-          >
-            Close
-          </button>
+          <div className="flex gap-1">
+            <button
+              onClick={pickFolder}
+              className="text-xs text-lume-600 hover:text-lume-700"
+              title="Change folder"
+            >
+              Change
+            </button>
+            <span className="text-sand-300">|</span>
+            <button
+              onClick={() => {
+                localStorage.removeItem("lume_workspace");
+                setWorkspacePath("");
+                setEntries([]);
+              }}
+              className="text-xs text-sand-400 hover:text-red-500"
+            >
+              Close
+            </button>
+          </div>
         </div>
         <div className="flex items-center gap-1 mt-1">
           {currentPath !== workspacePath && (
             <button
               onClick={navigateUp}
-              className="text-xs text-lume-600 hover:text-lume-700"
+              className="text-xs text-lume-600 hover:text-lume-700 font-mono"
             >
               ..
             </button>
           )}
-          <p className="text-[10px] text-sand-400 truncate">
+          <p className="text-[10px] text-sand-400 truncate font-mono">
             {currentPath}
           </p>
         </div>
       </div>
 
-      {/* File list */}
+      {/* File list / File view */}
       <div className="flex-1 overflow-y-auto">
         {selectedFile ? (
           <div className="p-3">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-sand-700 truncate">
+              <span className="text-xs font-medium text-sand-700 truncate font-mono">
                 {selectedFile.split("/").pop()}
               </span>
               <button
@@ -145,7 +159,7 @@ export default function WorkspacePanel() {
                   setSelectedFile(null);
                   setFileContent("");
                 }}
-                className="text-xs text-sand-400 hover:text-sand-600"
+                className="text-xs text-lume-600 hover:text-lume-700"
               >
                 Back
               </button>
@@ -163,10 +177,10 @@ export default function WorkspacePanel() {
                 onClick={() =>
                   entry.is_dir ? loadDir(entry.path) : openFile(entry.path)
                 }
-                className="w-full text-left px-3 py-1.5 rounded-lg text-sm hover:bg-surface-2 flex items-center gap-2 transition-colors"
+                className="w-full text-left px-3 py-1.5 rounded-lg text-sm hover:bg-white hover:shadow-sm flex items-center gap-2 transition-colors"
               >
-                <span className="text-xs shrink-0">
-                  {entry.is_dir ? "📁" : "📄"}
+                <span className="text-sand-400 text-xs font-mono shrink-0">
+                  {entry.is_dir ? "dir" : "   "}
                 </span>
                 <span className="truncate text-sand-700">{entry.name}</span>
                 {!entry.is_dir && (

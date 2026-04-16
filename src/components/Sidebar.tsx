@@ -6,12 +6,14 @@ interface SidebarProps {
   onTogglePanel: (panel: "none" | "memory" | "skills" | "workspace") => void;
   activePanel: "none" | "memory" | "skills" | "workspace";
   onOpenSettings: () => void;
+  onCollapse: () => void;
 }
 
 export default function Sidebar({
   onTogglePanel,
   activePanel,
   onOpenSettings,
+  onCollapse,
 }: SidebarProps) {
   const { sessions, setSessions, activeSessionId, setActiveSession } =
     useAppStore();
@@ -59,14 +61,23 @@ export default function Sidebar({
   };
 
   return (
-    <aside className="w-64 bg-surface-1 border-r border-surface-3 flex flex-col">
-      {/* Logo */}
+    <aside className="w-full h-full bg-surface-1 flex flex-col">
+      {/* Logo + Collapse */}
       <div className="p-4 border-b border-surface-3">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-lume-400 to-lume-700 flex items-center justify-center">
-            <span className="text-white font-bold text-sm">L</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-lume-400 to-lume-700 flex items-center justify-center">
+              <span className="text-white font-bold text-sm">L</span>
+            </div>
+            <span className="font-semibold text-lg text-sand-900">Lume</span>
           </div>
-          <span className="font-semibold text-lg text-sand-900">Lume</span>
+          <button
+            onClick={onCollapse}
+            className="text-sand-400 hover:text-sand-700 text-xs px-1"
+            title="Collapse sidebar"
+          >
+            &laquo;
+          </button>
         </div>
       </div>
 
