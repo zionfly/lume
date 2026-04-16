@@ -69,12 +69,18 @@ export const useAppStore = create<AppState>((set) => ({
   sessions: [],
   activeSessionId: null,
   setSessions: (sessions) => set({ sessions }),
-  setActiveSession: (id) => set({ activeSessionId: id }),
+  setActiveSession: (id) => set({ activeSessionId: id, messages: [] }),
 
   messages: [],
   setMessages: (messages) => set({ messages }),
   addMessage: (message) =>
-    set((state) => ({ messages: [...state.messages, message] })),
+    set((state) => {
+      // Only add if message belongs to the currently active session
+      if (state.activeSessionId && message.session_id !== state.activeSessionId) {
+        return state;
+      }
+      return { messages: [...state.messages, message] };
+    }),
 
   memoryProfile: null,
   setMemoryProfile: (profile) => set({ memoryProfile: profile }),
