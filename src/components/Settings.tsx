@@ -161,10 +161,10 @@ export default function Settings({ onClose }: SettingsProps) {
       <div className="bg-surface-1 rounded-2xl w-full max-w-xl max-h-[85vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="px-5 py-4 border-b border-surface-3 flex justify-between items-center shrink-0">
-          <h2 className="font-semibold text-lg">Settings</h2>
+          <h2 className="font-semibold text-lg text-sand-900">Settings</h2>
           <button
             onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-white hover:bg-surface-3 transition-colors"
+            className="w-7 h-7 flex items-center justify-center rounded-lg text-sand-400 hover:text-sand-900 hover:bg-surface-3 transition-colors"
           >
             x
           </button>
@@ -184,8 +184,8 @@ export default function Settings({ onClose }: SettingsProps) {
               onClick={() => setTab(id)}
               className={`py-2.5 px-4 text-sm font-medium transition-colors border-b-2 ${
                 tab === id
-                  ? "text-lume-400 border-lume-400"
-                  : "text-gray-500 border-transparent hover:text-gray-300"
+                  ? "text-lume-600 border-lume-600"
+                  : "text-sand-400 border-transparent hover:text-sand-700"
               }`}
             >
               {label}
@@ -199,7 +199,7 @@ export default function Settings({ onClose }: SettingsProps) {
             <>
               {/* ── Provider dropdown ── */}
               <div>
-                <label className="text-xs font-medium text-gray-400 mb-2 block">
+                <label className="text-xs font-medium text-sand-500 mb-2 block">
                   Provider
                 </label>
                 <select
@@ -212,7 +212,7 @@ export default function Settings({ onClose }: SettingsProps) {
                       apiKey: "", // reset key when switching
                     });
                   }}
-                  className="w-full bg-surface-2 rounded-xl px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-lume-400/50 appearance-none cursor-pointer"
+                  className="w-full bg-white border border-surface-3 rounded-xl px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-lume-400/50 appearance-none cursor-pointer text-sand-900"
                 >
                   {Object.entries(TIER_LABELS).map(([tier, label]) => {
                     const group = PROVIDERS.filter((p) => p.tier === tier);
@@ -233,13 +233,13 @@ export default function Settings({ onClose }: SettingsProps) {
               {/* ── Model dropdown ── */}
               {selectedProvider && (
                 <div>
-                  <label className="text-xs font-medium text-gray-400 mb-2 block">
+                  <label className="text-xs font-medium text-sand-500 mb-2 block">
                     Model
                   </label>
                   <select
                     value={config.model}
                     onChange={(e) => update({ model: e.target.value })}
-                    className="w-full bg-surface-2 rounded-xl px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-lume-400/50 appearance-none cursor-pointer"
+                    className="w-full bg-white border border-surface-3 rounded-xl px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-lume-400/50 appearance-none cursor-pointer text-sand-900"
                   >
                     {selectedProvider.models.map((m) => (
                       <option key={m.id} value={m.id}>
@@ -252,7 +252,7 @@ export default function Settings({ onClose }: SettingsProps) {
 
               {/* ── Authentication ── */}
               {selectedProvider && (
-                <div className="bg-surface-2 rounded-xl p-4 space-y-3">
+                <div className="bg-white shadow-sm rounded-xl p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div
@@ -261,12 +261,12 @@ export default function Settings({ onClose }: SettingsProps) {
                       >
                         {selectedProvider.icon}
                       </div>
-                      <span className="text-sm font-medium">
+                      <span className="text-sm font-medium text-sand-900">
                         {selectedProvider.name} Authentication
                       </span>
                     </div>
                     {authStatus[config.provider] === "connected" && (
-                      <span className="text-xs text-green-400 bg-green-400/10 px-2 py-0.5 rounded-full">
+                      <span className="text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded-full">
                         Connected
                       </span>
                     )}
@@ -276,11 +276,11 @@ export default function Settings({ onClose }: SettingsProps) {
                   <button
                     onClick={() => handleOAuthLogin(config.provider)}
                     disabled={authStatus[config.provider] === "loading"}
-                    className="w-full py-2.5 bg-surface-3 hover:bg-surface-4 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                    className="w-full py-2.5 bg-surface-3 hover:bg-surface-4 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2 text-sand-900"
                   >
                     {authStatus[config.provider] === "loading" ? (
                       <>
-                        <span className="w-3 h-3 border-2 border-lume-400 border-t-transparent rounded-full animate-spin" />
+                        <span className="w-3 h-3 border-2 border-lume-600 border-t-transparent rounded-full animate-spin" />
                         Opening {selectedProvider.name}...
                       </>
                     ) : (
@@ -288,7 +288,7 @@ export default function Settings({ onClose }: SettingsProps) {
                         {config.provider === "openai"
                           ? `Sign in with OpenAI OAuth`
                           : `Sign in to ${selectedProvider.name}`}
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-sand-400">
                           {config.provider === "openai"
                             ? "(auto-connects)"
                             : "(opens browser)"}
@@ -299,7 +299,7 @@ export default function Settings({ onClose }: SettingsProps) {
 
                   {/* API Key input + Connect button */}
                   <div>
-                    <label className="text-xs text-gray-500 mb-1 block">
+                    <label className="text-xs text-sand-400 mb-1 block">
                       Or paste your API Key directly
                     </label>
                     <div className="flex gap-2">
@@ -311,7 +311,7 @@ export default function Settings({ onClose }: SettingsProps) {
                           setTestResult(null);
                         }}
                         placeholder={selectedProvider.apiKeyPlaceholder}
-                        className="flex-1 bg-surface-3 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-lume-400/50 font-mono"
+                        className="flex-1 bg-white border border-surface-3 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-lume-400/50 font-mono text-sand-900"
                       />
                       <button
                         disabled={!config.apiKey || testing}
@@ -347,12 +347,12 @@ export default function Settings({ onClose }: SettingsProps) {
                         }}
                         className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-colors shrink-0 ${
                           !config.apiKey || testing
-                            ? "bg-surface-3 text-gray-600 cursor-not-allowed"
-                            : "bg-lume-500 hover:bg-lume-600 text-black"
+                            ? "bg-surface-3 text-sand-400 cursor-not-allowed"
+                            : "bg-lume-600 hover:bg-lume-700 text-white"
                         }`}
                       >
                         {testing ? (
-                          <span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin inline-block" />
+                          <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
                         ) : (
                           "Connect"
                         )}
@@ -363,8 +363,8 @@ export default function Settings({ onClose }: SettingsProps) {
                       <div
                         className={`mt-2 text-xs px-3 py-2 rounded-lg ${
                           testResult.success
-                            ? "bg-green-400/10 text-green-400"
-                            : "bg-red-400/10 text-red-400"
+                            ? "bg-green-100 text-green-600"
+                            : "bg-red-100 text-red-600"
                         }`}
                       >
                         {testResult.message}
@@ -377,7 +377,7 @@ export default function Settings({ onClose }: SettingsProps) {
                     config.provider === "siliconflow" ||
                     config.provider === "openrouter") && (
                     <div>
-                      <label className="text-xs text-gray-500 mb-1 block">
+                      <label className="text-xs text-sand-400 mb-1 block">
                         Base URL (optional override)
                       </label>
                       <input
@@ -386,7 +386,7 @@ export default function Settings({ onClose }: SettingsProps) {
                           update({ customBaseUrl: e.target.value })
                         }
                         placeholder="https://api.example.com/v1"
-                        className="w-full bg-surface-3 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-lume-400/50 font-mono"
+                        className="w-full bg-white border border-surface-3 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-lume-400/50 font-mono text-sand-900"
                       />
                     </div>
                   )}
@@ -395,7 +395,7 @@ export default function Settings({ onClose }: SettingsProps) {
                     href={selectedProvider.signupUrl}
                     target="_blank"
                     rel="noopener"
-                    className="block text-xs text-lume-400 hover:underline"
+                    className="block text-xs text-lume-600 hover:underline"
                   >
                     Don't have an account? Sign up at {selectedProvider.name} →
                   </a>
@@ -404,7 +404,7 @@ export default function Settings({ onClose }: SettingsProps) {
 
               {/* ── Quick switch: recent models ── */}
               <div>
-                <label className="text-xs font-medium text-gray-400 mb-2 block">
+                <label className="text-xs font-medium text-sand-500 mb-2 block">
                   Popular Models
                 </label>
                 <div className="grid grid-cols-2 gap-1.5">
@@ -427,8 +427,8 @@ export default function Settings({ onClose }: SettingsProps) {
                         }
                         className={`text-left px-3 py-2 rounded-lg text-xs transition-all flex items-center gap-2 ${
                           isActive
-                            ? "bg-lume-400/10 ring-1 ring-lume-400/30 text-lume-300"
-                            : "bg-surface-2 hover:bg-surface-3 text-gray-400"
+                            ? "bg-lume-100 ring-1 ring-lume-400/30 text-lume-700"
+                            : "bg-white shadow-sm hover:bg-surface-3 text-sand-500"
                         }`}
                       >
                         <div
@@ -448,7 +448,7 @@ export default function Settings({ onClose }: SettingsProps) {
 
           {tab === "bots" && (
             <div className="space-y-4">
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-sand-500">
                 Connect Lume to messaging platforms. Skills become slash
                 commands.
               </p>
@@ -474,16 +474,16 @@ export default function Settings({ onClose }: SettingsProps) {
               ].map((bot) => (
                 <div
                   key={bot.key}
-                  className="bg-surface-2 rounded-xl p-4 space-y-2"
+                  className="bg-white shadow-sm rounded-xl p-4 space-y-2"
                 >
                   <div className="flex items-center gap-2">
                     <div
                       className="w-5 h-5 rounded-md"
                       style={{ backgroundColor: bot.color }}
                     />
-                    <span className="text-sm font-medium">{bot.label}</span>
+                    <span className="text-sm font-medium text-sand-900">{bot.label}</span>
                     {config[bot.key] && (
-                      <span className="ml-auto text-xs text-green-400">
+                      <span className="ml-auto text-xs text-green-600">
                         Connected
                       </span>
                     )}
@@ -493,7 +493,7 @@ export default function Settings({ onClose }: SettingsProps) {
                     value={config[bot.key]}
                     onChange={(e) => update({ [bot.key]: e.target.value })}
                     placeholder={bot.placeholder}
-                    className="w-full bg-surface-3 rounded-lg px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-lume-400/50 font-mono"
+                    className="w-full bg-white border border-surface-3 rounded-lg px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-lume-400/50 font-mono text-sand-900"
                   />
                 </div>
               ))}
@@ -502,10 +502,10 @@ export default function Settings({ onClose }: SettingsProps) {
 
           {tab === "advanced" && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between bg-surface-2 rounded-xl p-4">
+              <div className="flex items-center justify-between bg-white shadow-sm rounded-xl p-4">
                 <div>
-                  <h4 className="text-sm font-medium">Action Preview</h4>
-                  <p className="text-xs text-gray-500 mt-0.5">
+                  <h4 className="text-sm font-medium text-sand-900">Action Preview</h4>
+                  <p className="text-xs text-sand-400 mt-0.5">
                     Show execution plan before every action
                   </p>
                 </div>
@@ -514,7 +514,7 @@ export default function Settings({ onClose }: SettingsProps) {
                     update({ actionPreview: !config.actionPreview })
                   }
                   className={`w-11 h-6 rounded-full transition-colors relative ${
-                    config.actionPreview ? "bg-lume-500" : "bg-surface-4"
+                    config.actionPreview ? "bg-lume-600" : "bg-surface-4"
                   }`}
                 >
                   <div
@@ -527,9 +527,9 @@ export default function Settings({ onClose }: SettingsProps) {
                 </button>
               </div>
 
-              <div className="bg-surface-2 rounded-xl p-4">
-                <h4 className="text-sm font-medium mb-2">Current Config</h4>
-                <div className="space-y-1 text-xs font-mono text-gray-400">
+              <div className="bg-white shadow-sm rounded-xl p-4">
+                <h4 className="text-sm font-medium text-sand-900 mb-2">Current Config</h4>
+                <div className="space-y-1 text-xs font-mono text-sand-500">
                   <div>provider: {config.provider}</div>
                   <div>model: {config.model}</div>
                   <div>
@@ -547,7 +547,7 @@ export default function Settings({ onClose }: SettingsProps) {
         <div className="px-5 py-4 border-t border-surface-3 shrink-0">
           <button
             onClick={handleSave}
-            className="w-full py-2.5 bg-lume-500 hover:bg-lume-600 text-black font-medium rounded-xl text-sm transition-colors"
+            className="w-full py-2.5 bg-lume-600 hover:bg-lume-700 text-white font-medium rounded-xl text-sm transition-colors"
           >
             {saved ? "Saved!" : "Save Settings"}
           </button>

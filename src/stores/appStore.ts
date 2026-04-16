@@ -39,7 +39,7 @@ interface AppState {
   sessions: Session[];
   activeSessionId: string | null;
   setSessions: (sessions: Session[]) => void;
-  setActiveSession: (id: string) => void;
+  setActiveSession: (id: string | null) => void;
 
   // Messages
   messages: Message[];

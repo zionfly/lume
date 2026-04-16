@@ -21,7 +21,7 @@ export default function HarnessPanel() {
 
   if (!stats) {
     return (
-      <div className="p-4 text-center text-xs text-gray-500">
+      <div className="p-4 text-center text-xs text-sand-400">
         Loading harness stats...
       </div>
     );
@@ -47,17 +47,17 @@ export default function HarnessPanel() {
       {/* Top tools */}
       {stats.top_tools.length > 0 && (
         <div>
-          <h4 className="text-xs font-medium text-gray-500 mb-2">
+          <h4 className="text-xs font-medium text-sand-400 mb-2">
             Top Tools
           </h4>
           <div className="space-y-1">
             {stats.top_tools.map(([name, count]) => (
               <div
                 key={name}
-                className="flex items-center justify-between text-xs bg-surface-2 rounded-lg px-3 py-1.5"
+                className="flex items-center justify-between text-xs bg-white shadow-sm rounded-lg px-3 py-1.5"
               >
-                <span className="font-mono text-gray-300">{name}</span>
-                <span className="text-gray-500">{count}x</span>
+                <span className="font-mono text-sand-700">{name}</span>
+                <span className="text-sand-400">{count}x</span>
               </div>
             ))}
           </div>
@@ -75,9 +75,9 @@ function StatCard({
   value: string | number;
 }) {
   return (
-    <div className="bg-surface-2 rounded-lg p-3">
-      <div className="text-lg font-semibold">{value}</div>
-      <div className="text-[10px] text-gray-500 mt-0.5">{label}</div>
+    <div className="bg-white shadow-sm rounded-lg p-3">
+      <div className="text-lg font-semibold text-sand-900">{value}</div>
+      <div className="text-[10px] text-sand-400 mt-0.5">{label}</div>
     </div>
   );
 }

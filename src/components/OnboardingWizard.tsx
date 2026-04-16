@@ -105,7 +105,7 @@ export default function OnboardingWizard() {
             <div
               key={i}
               className={`flex-1 h-1 rounded-full transition-colors ${
-                i <= step ? "bg-lume-400" : "bg-surface-3"
+                i <= step ? "bg-lume-600" : "bg-surface-3"
               }`}
             />
           ))}
@@ -113,12 +113,12 @@ export default function OnboardingWizard() {
 
         {/* Logo */}
         <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-lume-400 to-lume-600 flex items-center justify-center mb-6">
-          <span className="text-black font-bold text-lg">L</span>
+          <span className="text-white font-bold text-lg">L</span>
         </div>
 
         {/* Content */}
-        <h1 className="text-2xl font-semibold mb-1">{current.title}</h1>
-        <p className="text-sm text-gray-500 mb-6">{current.subtitle}</p>
+        <h1 className="text-2xl font-semibold mb-1 text-sand-900">{current.title}</h1>
+        <p className="text-sm text-sand-400 mb-6">{current.subtitle}</p>
 
         {/* Options */}
         {current.options && (
@@ -129,8 +129,8 @@ export default function OnboardingWizard() {
                 onClick={() => handleSelect(opt)}
                 className={`w-full text-left px-4 py-3 rounded-xl text-sm transition-all ${
                   isSelected(opt)
-                    ? "bg-lume-400/15 text-lume-300 ring-1 ring-lume-400/30"
-                    : "bg-surface-2 text-gray-300 hover:bg-surface-3"
+                    ? "bg-lume-100 text-lume-700 ring-1 ring-lume-400/30"
+                    : "bg-white shadow-sm text-sand-700 hover:bg-surface-3"
                 }`}
               >
                 {opt}
@@ -144,14 +144,14 @@ export default function OnboardingWizard() {
           {step > 0 && (
             <button
               onClick={() => setStep(step - 1)}
-              className="px-6 py-2.5 rounded-xl text-sm text-gray-400 hover:text-white transition-colors"
+              className="px-6 py-2.5 rounded-xl text-sm text-sand-500 hover:text-sand-900 transition-colors"
             >
               Back
             </button>
           )}
           <button
             onClick={handleNext}
-            className="flex-1 px-6 py-2.5 bg-lume-500 hover:bg-lume-600 text-black font-medium rounded-xl text-sm transition-colors"
+            className="flex-1 px-6 py-2.5 bg-lume-600 hover:bg-lume-700 text-white font-medium rounded-xl text-sm transition-colors"
           >
             {step === STEPS.length - 1 ? "Start Using Lume" : "Continue"}
           </button>

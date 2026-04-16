@@ -206,6 +206,81 @@ pub async fn get_session_messages(
     Ok(messages)
 }
 
+#[tauri::command]
+pub async fn rename_session(
+    db: State<'_, Database>,
+    session_id: String,
+    title: String,
+) -> Result<String, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "UPDATE sessions SET title = ?1, updated_at = datetime('now') WHERE id = ?2",
+        rusqlite::params![&title, &session_id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok("renamed".into())
+}
+
+#[tauri::command]
+pub async fn delete_session(db: State<'_, Database>, session_id: String) -> Result<String, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "DELETE FROM messages WHERE session_id = ?1",
+        rusqlite::params![&session_id],
+    )
+    .map_err(|e| e.to_string())?;
+    conn.execute(
+        "DELETE FROM sessions WHERE id = ?1",
+        rusqlite::params![&session_id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok("deleted".into())
+}
+
+// ────────────────────────── Workspace ──────────────────────────
+
+#[derive(Serialize)]
+pub struct FileEntry {
+    pub name: String,
+    pub path: String,
+    pub is_dir: bool,
+    pub size: u64,
+}
+
+#[tauri::command]
+pub async fn list_workspace(path: String) -> Result<Vec<FileEntry>, String> {
+    let dir = std::path::Path::new(&path);
+    if !dir.is_dir() {
+        return Err(format!("Not a directory: {}", path));
+    }
+    let mut entries = Vec::new();
+    let read_dir = std::fs::read_dir(dir).map_err(|e| e.to_string())?;
+    for entry in read_dir {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let meta = entry.metadata().map_err(|e| e.to_string())?;
+        let name = entry.file_name().to_string_lossy().to_string();
+        // Skip hidden files
+        if name.starts_with('.') {
+            continue;
+        }
+        entries.push(FileEntry {
+            name,
+            path: entry.path().to_string_lossy().to_string(),
+            is_dir: meta.is_dir(),
+            size: meta.len(),
+        });
+    }
+    entries.sort_by(|a, b| {
+        b.is_dir.cmp(&a.is_dir).then(a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+    });
+    Ok(entries)
+}
+
+#[tauri::command]
+pub async fn read_workspace_file(path: String) -> Result<String, String> {
+    std::fs::read_to_string(&path).map_err(|e| format!("Failed to read {}: {}", path, e))
+}
+
 // ────────────────────────── Memory ──────────────────────────
 
 #[tauri::command]

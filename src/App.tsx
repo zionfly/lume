@@ -3,11 +3,12 @@ import Sidebar from "./components/Sidebar";
 import ChatView from "./components/ChatView";
 import MemoryPanel from "./components/MemoryPanel";
 import SkillBrowser from "./components/SkillBrowser";
+import WorkspacePanel from "./components/WorkspacePanel";
 import OnboardingWizard from "./components/OnboardingWizard";
 import Settings from "./components/Settings";
 import { useAppStore } from "./stores/appStore";
 
-type RightPanel = "none" | "memory" | "skills";
+type RightPanel = "none" | "memory" | "skills" | "workspace";
 
 function App() {
   const { isOnboarded } = useAppStore();
@@ -29,6 +30,7 @@ function App() {
         <ChatView />
         {rightPanel === "memory" && <MemoryPanel />}
         {rightPanel === "skills" && <SkillBrowser />}
+        {rightPanel === "workspace" && <WorkspacePanel />}
       </main>
       {showSettings && <Settings onClose={() => setShowSettings(false)} />}
     </div>

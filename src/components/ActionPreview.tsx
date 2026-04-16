@@ -22,9 +22,9 @@ interface ActionPreviewProps {
 }
 
 const riskColors = {
-  low: "text-green-400 bg-green-400/10",
-  medium: "text-yellow-400 bg-yellow-400/10",
-  high: "text-red-400 bg-red-400/10",
+  low: "text-green-600 bg-green-100",
+  medium: "text-yellow-600 bg-yellow-100",
+  high: "text-red-600 bg-red-100",
 };
 
 export default function ActionPreview({
@@ -37,12 +37,12 @@ export default function ActionPreview({
   const [showModify, setShowModify] = useState(false);
 
   return (
-    <div className="bg-surface-2 rounded-2xl p-4 border border-surface-4">
+    <div className="bg-white shadow-sm rounded-2xl p-4 border border-surface-3">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-lume-400 animate-pulse" />
-          <span className="text-sm font-medium">Action Preview</span>
+          <div className="w-2 h-2 rounded-full bg-lume-600 animate-pulse" />
+          <span className="text-sm font-medium text-sand-900">Action Preview</span>
         </div>
         <span
           className={`text-xs px-2 py-0.5 rounded-full ${riskColors[plan.risk]}`}
@@ -52,24 +52,24 @@ export default function ActionPreview({
       </div>
 
       {/* Plan title */}
-      <h4 className="text-sm font-semibold mb-3">{plan.title}</h4>
+      <h4 className="text-sm font-semibold text-sand-900 mb-3">{plan.title}</h4>
 
       {/* Steps */}
       <div className="space-y-2 mb-4">
         {plan.steps.map((step, i) => (
           <div
             key={i}
-            className="flex items-start gap-2 text-xs bg-surface-3 rounded-lg p-2"
+            className="flex items-start gap-2 text-xs bg-surface-2 rounded-lg p-2"
           >
-            <span className="text-gray-500 font-mono min-w-[1.5rem]">
+            <span className="text-sand-400 font-mono min-w-[1.5rem]">
               {i + 1}.
             </span>
             <div className="flex-1">
-              <p className="text-gray-300">{step.description}</p>
+              <p className="text-sand-700">{step.description}</p>
               <div className="flex items-center gap-2 mt-1">
-                <span className="text-gray-600 font-mono">{step.tool}</span>
+                <span className="text-sand-400 font-mono">{step.tool}</span>
                 {!step.reversible && (
-                  <span className="text-red-400/70 text-[10px]">
+                  <span className="text-red-600/70 text-[10px]">
                     irreversible
                   </span>
                 )}
@@ -93,7 +93,7 @@ export default function ActionPreview({
               }
             }}
             placeholder="How should Lume adjust this plan?"
-            className="w-full bg-surface-3 rounded-lg px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-lume-400/50"
+            className="w-full bg-white border border-surface-3 rounded-lg px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-lume-400/50"
             autoFocus
           />
         </div>
@@ -103,19 +103,19 @@ export default function ActionPreview({
       <div className="flex gap-2">
         <button
           onClick={() => onApprove(plan.id)}
-          className="flex-1 py-2 bg-lume-500 hover:bg-lume-600 text-black font-medium rounded-lg text-xs transition-colors"
+          className="flex-1 py-2 bg-lume-600 hover:bg-lume-700 text-white font-medium rounded-lg text-xs transition-colors"
         >
           Approve
         </button>
         <button
           onClick={() => setShowModify(!showModify)}
-          className="px-4 py-2 bg-surface-3 hover:bg-surface-4 rounded-lg text-xs transition-colors"
+          className="px-4 py-2 bg-surface-3 hover:bg-surface-4 rounded-lg text-xs transition-colors text-sand-700"
         >
           Modify
         </button>
         <button
           onClick={() => onReject(plan.id)}
-          className="px-4 py-2 bg-surface-3 hover:bg-red-500/20 text-red-400 rounded-lg text-xs transition-colors"
+          className="px-4 py-2 bg-surface-3 hover:bg-red-100 text-red-600 rounded-lg text-xs transition-colors"
         >
           Reject
         </button>
