@@ -72,12 +72,17 @@ pub async fn send_message(
         format!("\n<available_skills>\n{}\n</available_skills>", skills_list.join("\n"))
     };
 
-    // Build workspace context if workspace is set
-    // Also auto-read files mentioned in user's message
-    let workspace_block = workspace_path
-        .as_ref()
-        .map(|p| build_workspace_context_with_mentions(p, &content))
-        .unwrap_or_default();
+    // Build workspace context (runs in blocking thread pool to avoid blocking async executor)
+    let workspace_block = if let Some(ws_path) = workspace_path.clone() {
+        let content_clone = content.clone();
+        tokio::task::spawn_blocking(move || {
+            build_workspace_context_with_mentions(&ws_path, &content_clone)
+        })
+        .await
+        .unwrap_or_default()
+    } else {
+        String::new()
+    };
 
     let system_prompt = format!(
         "You are Lume, an AI assistant that illuminates the user's workflow. \
@@ -930,10 +935,32 @@ fn read_file_smart(path: &str) -> String {
         .map(|e| e.to_lowercase())
         .unwrap_or_default();
 
-    // PDF: extract text
+    // PDF: extract text (with size limit + timeout via thread)
     if ext == "pdf" {
-        match pdf_extract::extract_text(path) {
-            Ok(text) => {
+        let size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+        const MAX_PDF_SIZE: u64 = 10 * 1024 * 1024; // 10 MB
+        if size > MAX_PDF_SIZE {
+            return format!(
+                "[PDF too large to auto-read: {:.1} MB. Ask user for specific pages/sections.]",
+                size as f64 / 1024.0 / 1024.0
+            );
+        }
+
+        tracing::info!("Extracting PDF: {} ({:.1} KB)", path, size as f64 / 1024.0);
+
+        // Run extraction in a thread with 15s timeout
+        let path_owned = path.to_string();
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                pdf_extract::extract_text(&path_owned)
+            }));
+            let _ = tx.send(result);
+        });
+
+        match rx.recv_timeout(std::time::Duration::from_secs(15)) {
+            Ok(Ok(Ok(text))) => {
+                tracing::info!("PDF extracted: {} chars", text.len());
                 let truncated = if text.len() > 5000 {
                     format!("{}\n... (PDF truncated, {} chars total)", &text[..5000], text.len())
                 } else {
@@ -941,7 +968,18 @@ fn read_file_smart(path: &str) -> String {
                 };
                 return truncated;
             }
-            Err(e) => return format!("[PDF extraction failed: {}]", e),
+            Ok(Ok(Err(e))) => {
+                tracing::error!("PDF extraction error: {}", e);
+                return format!("[PDF extraction failed: {}]", e);
+            }
+            Ok(Err(_)) => {
+                tracing::error!("PDF extraction panicked");
+                return "[PDF extraction panicked — file may be corrupted or unsupported format]".into();
+            }
+            Err(_) => {
+                tracing::error!("PDF extraction timed out");
+                return "[PDF extraction timed out after 15s — file too complex]".into();
+            }
         }
     }
 
