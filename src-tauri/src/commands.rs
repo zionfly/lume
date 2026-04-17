@@ -20,6 +20,7 @@ pub async fn send_message(
     model: Option<String>,
     api_key: Option<String>,
     base_url: Option<String>,
+    workspace_path: Option<String>,
 ) -> Result<Message, String> {
     let msg_id = uuid::Uuid::new_v4().to_string();
 
@@ -71,12 +72,19 @@ pub async fn send_message(
         format!("\n<available_skills>\n{}\n</available_skills>", skills_list.join("\n"))
     };
 
+    // Build workspace context if workspace is set
+    let workspace_block = workspace_path
+        .as_ref()
+        .map(|p| build_workspace_context(p))
+        .unwrap_or_default();
+
     let system_prompt = format!(
         "You are Lume, an AI assistant that illuminates the user's workflow. \
          You grow smarter with every interaction through your memory and skill systems.\n\n\
-         {}\n{}\n\n\
-         Be concise and direct. Show your reasoning for non-trivial decisions.",
-        system_context, skills_block
+         {}\n{}\n{}\n\n\
+         Be concise and direct. Show your reasoning for non-trivial decisions. \
+         When the user has a workspace open, use it as context for answers.",
+        system_context, skills_block, workspace_block
     );
 
     // Direct API call using saved settings
@@ -773,5 +781,120 @@ pub async fn test_connection(
                 latency_ms: latency,
             })
         }
+    }
+}
+
+// ────────────────────────── Workspace Context ──────────────────────────
+
+/// Build a workspace context summary for the system prompt.
+/// Includes directory tree (up to 3 levels) + contents of key project files.
+fn build_workspace_context(workspace_path: &str) -> String {
+    let path = std::path::Path::new(workspace_path);
+    if !path.is_dir() {
+        return String::new();
+    }
+
+    let mut out = String::new();
+    out.push_str(&format!("\n<workspace path=\"{}\">\n", workspace_path));
+
+    // 1. Project tree (max 3 levels, skip common noise)
+    out.push_str("## File Tree\n```\n");
+    walk_tree(path, path, 0, 3, &mut out);
+    out.push_str("```\n\n");
+
+    // 2. Key project files
+    let key_files = [
+        "README.md", "README.rst", "README",
+        "package.json", "Cargo.toml", "pyproject.toml", "go.mod",
+        "tsconfig.json", "requirements.txt", "Gemfile",
+        ".gitignore",
+    ];
+    let mut found_files = Vec::new();
+    for filename in &key_files {
+        let file_path = path.join(filename);
+        if file_path.is_file() {
+            if let Ok(content) = std::fs::read_to_string(&file_path) {
+                let truncated = if content.len() > 2000 {
+                    format!("{}\n... (truncated, {} chars total)", &content[..2000], content.len())
+                } else {
+                    content
+                };
+                found_files.push((filename.to_string(), truncated));
+            }
+        }
+    }
+
+    if !found_files.is_empty() {
+        out.push_str("## Key Files\n");
+        for (name, content) in found_files {
+            out.push_str(&format!("\n### {}\n```\n{}\n```\n", name, content));
+        }
+    }
+
+    out.push_str("</workspace>\n");
+
+    // Limit total workspace context to ~8000 chars to avoid token blowup
+    if out.len() > 8000 {
+        let truncated = &out[..7900];
+        format!("{}\n... (workspace context truncated)\n</workspace>\n", truncated)
+    } else {
+        out
+    }
+}
+
+/// Recursive directory walk with depth limit and skip patterns
+fn walk_tree(root: &std::path::Path, current: &std::path::Path, depth: usize, max_depth: usize, out: &mut String) {
+    if depth > max_depth {
+        return;
+    }
+    let entries = match std::fs::read_dir(current) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+
+    let skip_patterns = [
+        "node_modules", ".git", "target", "dist", "build", ".next", ".nuxt",
+        "__pycache__", ".venv", "venv", ".idea", ".vscode", ".DS_Store",
+        "coverage", ".cache", ".pytest_cache", "__MACOSX",
+    ];
+
+    let mut items: Vec<_> = entries.filter_map(|e| e.ok()).collect();
+    items.sort_by_key(|e| e.file_name());
+
+    // Limit to 50 items per directory to avoid explosion
+    let shown: Vec<_> = items.iter().take(50).collect();
+    let remaining = items.len().saturating_sub(50);
+
+    for entry in shown {
+        let name = entry.file_name().to_string_lossy().to_string();
+
+        // Skip hidden and noise
+        if name.starts_with('.') && depth == 0 {
+            // Allow .gitignore, .env.example at top level
+            if name != ".gitignore" && name != ".env.example" {
+                continue;
+            }
+        }
+        if skip_patterns.iter().any(|p| name == *p) {
+            continue;
+        }
+
+        let indent = "  ".repeat(depth);
+        let rel = entry.path().strip_prefix(root).unwrap_or(&entry.path()).to_string_lossy().to_string();
+        let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
+
+        if is_dir {
+            out.push_str(&format!("{}{}/\n", indent, name));
+            walk_tree(root, &entry.path(), depth + 1, max_depth, out);
+        } else {
+            // Suppress file path for depth 0, use relative for deeper
+            let display = if depth == 0 { name } else { rel };
+            out.push_str(&format!("{}{}\n", indent, display));
+        }
+    }
+
+    if remaining > 0 {
+        let indent = "  ".repeat(depth);
+        out.push_str(&format!("{}... ({} more items)\n", indent, remaining));
     }
 }

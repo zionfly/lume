@@ -57,6 +57,7 @@ export default function ChatView() {
     setLoading(true);
 
     try {
+      const workspacePath = localStorage.getItem("lume_workspace") || null;
       const reply = await invoke<Message>("send_message", {
         sessionId: activeSessionId,
         content: input,
@@ -64,6 +65,7 @@ export default function ChatView() {
         model: chatModel,
         apiKey: settings.apiKey || null,
         baseUrl: settings.customBaseUrl || null,
+        workspacePath,
       });
       addMessage(reply);
     } catch (err) {
@@ -187,6 +189,16 @@ export default function ChatView() {
           <span className="text-[10px] text-sand-400">
             {currentProvider?.name}
           </span>
+          {/* Workspace indicator */}
+          {localStorage.getItem("lume_workspace") && (
+            <span
+              className="ml-auto text-[10px] text-lume-700 bg-lume-100 px-2 py-0.5 rounded-full flex items-center gap-1"
+              title={`Workspace context active: ${localStorage.getItem("lume_workspace")}`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-lume-600" />
+              workspace
+            </span>
+          )}
         </div>
 
         {/* Input + send */}
