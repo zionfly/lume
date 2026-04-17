@@ -58,6 +58,7 @@ pub fn run() {
             commands::delete_session,
             commands::list_workspace,
             commands::read_workspace_file,
+            commands::preview_workspace_context,
             commands::save_onboarding,
             commands::get_settings,
             commands::save_settings,

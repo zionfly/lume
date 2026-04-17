@@ -74,23 +74,37 @@ pub async fn send_message(
 
     // Build workspace context (runs in blocking thread pool to avoid blocking async executor)
     let workspace_block = if let Some(ws_path) = workspace_path.clone() {
+        tracing::info!("Building workspace context for: {}", ws_path);
         let content_clone = content.clone();
-        tokio::task::spawn_blocking(move || {
+        let block = tokio::task::spawn_blocking(move || {
             build_workspace_context_with_mentions(&ws_path, &content_clone)
         })
         .await
-        .unwrap_or_default()
+        .unwrap_or_default();
+        tracing::info!("Workspace context built: {} chars", block.len());
+        block
     } else {
+        tracing::info!("No workspace set for this message");
         String::new()
+    };
+
+    let workspace_instruction = if workspace_block.is_empty() {
+        ""
+    } else {
+        "\n\n**IMPORTANT**: You DO have access to the workspace files shown above. \
+         When the user mentions a file that appears in 'Files Referenced in Your Message', \
+         its full content is embedded in this prompt — read it directly. \
+         Never claim you lack permission to read files; the content is right there. \
+         If a file's content is not in the context, it means the user did not mention it by exact filename — \
+         ask them to clarify which specific file."
     };
 
     let system_prompt = format!(
         "You are Lume, an AI assistant that illuminates the user's workflow. \
          You grow smarter with every interaction through your memory and skill systems.\n\n\
-         {}\n{}\n{}\n\n\
-         Be concise and direct. Show your reasoning for non-trivial decisions. \
-         When the user has a workspace open, use it as context for answers.",
-        system_context, skills_block, workspace_block
+         {}\n{}\n{}{}\n\n\
+         Be concise and direct. Show your reasoning for non-trivial decisions.",
+        system_context, skills_block, workspace_block, workspace_instruction
     );
 
     // Direct API call using saved settings
@@ -288,6 +302,20 @@ pub async fn list_workspace(path: String) -> Result<Vec<FileEntry>, String> {
         b.is_dir.cmp(&a.is_dir).then(a.name.to_lowercase().cmp(&b.name.to_lowercase()))
     });
     Ok(entries)
+}
+
+/// Debug: preview what workspace context will be injected for a given message
+#[tauri::command]
+pub async fn preview_workspace_context(
+    workspace_path: String,
+    user_message: String,
+) -> Result<String, String> {
+    let result = tokio::task::spawn_blocking(move || {
+        build_workspace_context_with_mentions(&workspace_path, &user_message)
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    Ok(result)
 }
 
 #[tauri::command]

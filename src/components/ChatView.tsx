@@ -189,14 +189,35 @@ export default function ChatView() {
           <span className="text-[10px] text-sand-400">
             {currentProvider?.name}
           </span>
-          {/* Workspace indicator */}
-          {localStorage.getItem("lume_workspace") && (
-            <span
-              className="ml-auto text-[10px] text-lume-700 bg-lume-100 px-2 py-0.5 rounded-full flex items-center gap-1"
-              title={`Workspace context active: ${localStorage.getItem("lume_workspace")}`}
+          {/* Workspace indicator + preview */}
+          {localStorage.getItem("lume_workspace") ? (
+            <button
+              onClick={async () => {
+                const ws = localStorage.getItem("lume_workspace") || "";
+                try {
+                  const preview = await invoke<string>(
+                    "preview_workspace_context",
+                    { workspacePath: ws, userMessage: input || "(no message)" }
+                  );
+                  alert(
+                    `Workspace context that will be sent to AI:\n\n${preview.slice(0, 2000)}${preview.length > 2000 ? "\n\n... (truncated, " + preview.length + " chars total)" : ""}`
+                  );
+                } catch (err) {
+                  alert(`Preview error: ${err}`);
+                }
+              }}
+              className="ml-auto text-[10px] text-lume-700 bg-lume-100 px-2 py-0.5 rounded-full flex items-center gap-1 hover:bg-lume-200"
+              title={`Workspace: ${localStorage.getItem("lume_workspace")}\nClick to preview what's sent to AI`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-lume-600" />
-              workspace
+              workspace (preview)
+            </button>
+          ) : (
+            <span
+              className="ml-auto text-[10px] text-sand-400 bg-surface-2 px-2 py-0.5 rounded-full"
+              title="No workspace set — AI can't read your files. Open Workspace panel to set one."
+            >
+              no workspace
             </span>
           )}
         </div>
