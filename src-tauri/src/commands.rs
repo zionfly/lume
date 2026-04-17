@@ -73,9 +73,10 @@ pub async fn send_message(
     };
 
     // Build workspace context if workspace is set
+    // Also auto-read files mentioned in user's message
     let workspace_block = workspace_path
         .as_ref()
-        .map(|p| build_workspace_context(p))
+        .map(|p| build_workspace_context_with_mentions(p, &content))
         .unwrap_or_default();
 
     let system_prompt = format!(
@@ -286,6 +287,18 @@ pub async fn list_workspace(path: String) -> Result<Vec<FileEntry>, String> {
 
 #[tauri::command]
 pub async fn read_workspace_file(path: String) -> Result<String, String> {
+    // Support PDFs via pdf-extract
+    let ext = std::path::Path::new(&path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_lowercase())
+        .unwrap_or_default();
+
+    if ext == "pdf" {
+        return pdf_extract::extract_text(&path)
+            .map_err(|e| format!("PDF extraction failed: {}", e));
+    }
+
     std::fs::read_to_string(&path).map_err(|e| format!("Failed to read {}: {}", path, e))
 }
 
@@ -786,9 +799,11 @@ pub async fn test_connection(
 
 // ────────────────────────── Workspace Context ──────────────────────────
 
-/// Build a workspace context summary for the system prompt.
-/// Includes directory tree (up to 3 levels) + contents of key project files.
-fn build_workspace_context(workspace_path: &str) -> String {
+/// Build workspace context with:
+/// - File tree overview
+/// - Key project files (README, package.json, etc.)
+/// - Auto-read files that the user mentions in their message (by name or path)
+fn build_workspace_context_with_mentions(workspace_path: &str, user_message: &str) -> String {
     let path = std::path::Path::new(workspace_path);
     if !path.is_dir() {
         return String::new();
@@ -797,48 +812,156 @@ fn build_workspace_context(workspace_path: &str) -> String {
     let mut out = String::new();
     out.push_str(&format!("\n<workspace path=\"{}\">\n", workspace_path));
 
-    // 1. Project tree (max 3 levels, skip common noise)
+    // 1. Build a complete file index (for mention matching)
+    let all_files = index_workspace_files(path);
+
+    // 2. Parse user message for file mentions
+    let mentioned = find_mentioned_files(user_message, &all_files);
+
+    // 3. Project tree
     out.push_str("## File Tree\n```\n");
     walk_tree(path, path, 0, 3, &mut out);
     out.push_str("```\n\n");
 
-    // 2. Key project files
-    let key_files = [
-        "README.md", "README.rst", "README",
-        "package.json", "Cargo.toml", "pyproject.toml", "go.mod",
-        "tsconfig.json", "requirements.txt", "Gemfile",
-        ".gitignore",
-    ];
-    let mut found_files = Vec::new();
-    for filename in &key_files {
-        let file_path = path.join(filename);
-        if file_path.is_file() {
-            if let Ok(content) = std::fs::read_to_string(&file_path) {
-                let truncated = if content.len() > 2000 {
-                    format!("{}\n... (truncated, {} chars total)", &content[..2000], content.len())
-                } else {
-                    content
-                };
-                found_files.push((filename.to_string(), truncated));
-            }
+    // 4. Auto-read files mentioned in user message
+    if !mentioned.is_empty() {
+        out.push_str("## Files Referenced in Your Message\n");
+        for file_path in mentioned.iter().take(5) {
+            let filename = std::path::Path::new(file_path)
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| file_path.clone());
+
+            let content = read_file_smart(file_path);
+            out.push_str(&format!("\n### {}\n```\n{}\n```\n", filename, content));
         }
     }
 
-    if !found_files.is_empty() {
-        out.push_str("## Key Files\n");
-        for (name, content) in found_files {
+    // 5. Key project files (only if not already shown)
+    let key_files = [
+        "README.md", "README.rst", "README",
+        "package.json", "Cargo.toml", "pyproject.toml", "go.mod",
+        "tsconfig.json", "requirements.txt",
+    ];
+    let mut found = Vec::new();
+    for filename in &key_files {
+        let file_path = path.join(filename);
+        let path_str = file_path.to_string_lossy().to_string();
+        if mentioned.contains(&path_str) {
+            continue; // Already included
+        }
+        if file_path.is_file() {
+            if let Ok(content) = std::fs::read_to_string(&file_path) {
+                let truncated = if content.len() > 1500 {
+                    format!("{}\n... (truncated)", &content[..1500])
+                } else {
+                    content
+                };
+                found.push((filename.to_string(), truncated));
+            }
+        }
+    }
+    if !found.is_empty() {
+        out.push_str("\n## Key Project Files\n");
+        for (name, content) in found {
             out.push_str(&format!("\n### {}\n```\n{}\n```\n", name, content));
         }
     }
 
     out.push_str("</workspace>\n");
 
-    // Limit total workspace context to ~8000 chars to avoid token blowup
-    if out.len() > 8000 {
-        let truncated = &out[..7900];
+    // Limit total workspace context to 15000 chars (was 8000 — increased for file content)
+    if out.len() > 15000 {
+        let truncated = &out[..14800];
         format!("{}\n... (workspace context truncated)\n</workspace>\n", truncated)
     } else {
         out
+    }
+}
+
+/// Recursively index all files in workspace (for mention detection)
+fn index_workspace_files(root: &std::path::Path) -> Vec<String> {
+    let skip = [
+        "node_modules", ".git", "target", "dist", "build", ".next",
+        "__pycache__", ".venv", "venv", ".idea", ".vscode",
+    ];
+
+    walkdir::WalkDir::new(root)
+        .max_depth(4)
+        .into_iter()
+        .filter_entry(|e| {
+            let name = e.file_name().to_string_lossy();
+            !skip.iter().any(|s| name == *s) && !name.starts_with('.')
+                || name == ".gitignore"
+                || name == ".env.example"
+        })
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file())
+        .map(|e| e.path().to_string_lossy().to_string())
+        .collect()
+}
+
+/// Find files mentioned in the user's message (by exact filename or partial path)
+fn find_mentioned_files(message: &str, all_files: &[String]) -> Vec<String> {
+    let mut matches = Vec::new();
+    let msg_lower = message.to_lowercase();
+
+    for file_path in all_files {
+        let filename = std::path::Path::new(file_path)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+
+        // Match if user mentions the full filename (case-insensitive, at least 5 chars to avoid false positives)
+        if filename.len() >= 5 && msg_lower.contains(&filename) {
+            matches.push(file_path.clone());
+        }
+    }
+
+    matches
+}
+
+/// Read a file smartly — handles text files, PDFs, and binary detection
+fn read_file_smart(path: &str) -> String {
+    let p = std::path::Path::new(path);
+    let ext = p
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_lowercase())
+        .unwrap_or_default();
+
+    // PDF: extract text
+    if ext == "pdf" {
+        match pdf_extract::extract_text(path) {
+            Ok(text) => {
+                let truncated = if text.len() > 5000 {
+                    format!("{}\n... (PDF truncated, {} chars total)", &text[..5000], text.len())
+                } else {
+                    text
+                };
+                return truncated;
+            }
+            Err(e) => return format!("[PDF extraction failed: {}]", e),
+        }
+    }
+
+    // Binary files — just show info
+    let binary_exts = ["png", "jpg", "jpeg", "gif", "svg", "ico", "webp", "mp3", "mp4", "mov", "zip", "tar", "gz", "exe", "dll", "so", "dylib"];
+    if binary_exts.contains(&ext.as_str()) {
+        let size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+        return format!("[binary file, {} bytes]", size);
+    }
+
+    // Text file
+    match std::fs::read_to_string(path) {
+        Ok(content) => {
+            if content.len() > 5000 {
+                format!("{}\n... (truncated, {} chars total)", &content[..5000], content.len())
+            } else {
+                content
+            }
+        }
+        Err(e) => format!("[read error: {}]", e),
     }
 }
 
