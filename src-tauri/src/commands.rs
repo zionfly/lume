@@ -73,19 +73,23 @@ pub async fn send_message(
     };
 
     // Build workspace context (runs in blocking thread pool to avoid blocking async executor)
-    let workspace_block = if let Some(ws_path) = workspace_path.clone() {
+    let (workspace_block, auto_read_files) = if let Some(ws_path) = workspace_path.clone() {
         tracing::info!("Building workspace context for: {}", ws_path);
         let content_clone = content.clone();
-        let block = tokio::task::spawn_blocking(move || {
-            build_workspace_context_with_mentions(&ws_path, &content_clone)
+        let result = tokio::task::spawn_blocking(move || {
+            build_workspace_context_detailed(&ws_path, &content_clone)
         })
         .await
-        .unwrap_or_default();
-        tracing::info!("Workspace context built: {} chars", block.len());
-        block
+        .unwrap_or_else(|_| (String::new(), vec![]));
+        tracing::info!(
+            "Workspace context: {} chars, {} auto-read files",
+            result.0.len(),
+            result.1.len()
+        );
+        result
     } else {
         tracing::info!("No workspace set for this message");
-        String::new()
+        (String::new(), vec![])
     };
 
     let workspace_instruction = if workspace_block.is_empty() {
@@ -124,10 +128,36 @@ pub async fn send_message(
         });
     }
 
-    let reply_content = call_llm_direct(
+    let mut reply_content = call_llm_direct(
         &provider_id, &model_id, &key, base_url.as_deref(),
         &system_prompt, &history,
     ).await?;
+
+    // Prepend a diagnostic line showing what was auto-read (if anything)
+    if !auto_read_files.is_empty() {
+        let files_summary: Vec<String> = auto_read_files
+            .iter()
+            .take(5)
+            .map(|p| {
+                std::path::Path::new(p)
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| p.clone())
+            })
+            .collect();
+        let diag = format!(
+            "> *auto-read from workspace: {}*\n\n",
+            files_summary.join(", ")
+        );
+        reply_content = format!("{}{}", diag, reply_content);
+    } else if workspace_path.is_some() && (content.to_lowercase().contains(".pdf") || content.contains("@")) {
+        // User referenced a file but none was matched — warn them
+        reply_content = format!(
+            "> *no files matched in workspace — check that the file exists at `{}` and the filename is spelled correctly*\n\n{}",
+            workspace_path.as_deref().unwrap_or(""),
+            reply_content
+        );
+    }
 
     // Record tool call for skill checkpoint
     let should_evaluate = skills.record_tool_call();
@@ -832,6 +862,18 @@ pub async fn test_connection(
 
 // ────────────────────────── Workspace Context ──────────────────────────
 
+/// Same as build_workspace_context_with_mentions but also returns list of auto-read files
+pub fn build_workspace_context_detailed(workspace_path: &str, user_message: &str) -> (String, Vec<String>) {
+    let path = std::path::Path::new(workspace_path);
+    if !path.is_dir() {
+        return (String::new(), vec![]);
+    }
+    let all_files = index_workspace_files(path);
+    let mentioned = find_mentioned_files(user_message, &all_files);
+    let context = build_workspace_context_with_mentions(workspace_path, user_message);
+    (context, mentioned)
+}
+
 /// Build workspace context with:
 /// - File tree overview
 /// - Key project files (README, package.json, etc.)
@@ -948,6 +990,27 @@ fn find_mentioned_files(message: &str, all_files: &[String]) -> Vec<String> {
         // Match if user mentions the full filename (case-insensitive, at least 5 chars to avoid false positives)
         if filename.len() >= 5 && msg_lower.contains(&filename) {
             matches.push(file_path.clone());
+        }
+    }
+
+    // Fallback: if no match in workspace, search common user folders (Desktop, Documents, Downloads)
+    if matches.is_empty() {
+        if let Ok(home) = std::env::var("HOME") {
+            for folder in &["Desktop", "Documents", "Downloads"] {
+                let search_root = std::path::Path::new(&home).join(folder);
+                if !search_root.is_dir() {
+                    continue;
+                }
+                // Shallow scan (1 level only) to find mentioned files
+                if let Ok(entries) = std::fs::read_dir(&search_root) {
+                    for entry in entries.flatten() {
+                        let name = entry.file_name().to_string_lossy().to_lowercase();
+                        if name.len() >= 5 && msg_lower.contains(&name) {
+                            matches.push(entry.path().to_string_lossy().to_string());
+                        }
+                    }
+                }
+            }
         }
     }
 
